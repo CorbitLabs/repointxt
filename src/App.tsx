@@ -259,29 +259,30 @@ export default function App() {
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => trackGitHubOutbound('header_star')}
+              aria-label={`Star repointxt on GitHub, ${repoStars !== null ? repoStars : 0} stars`}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 6,
-                backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.05)',
-                color: isDark ? '#f0f6fc' : '#1f2328',
+                backgroundColor: 'var(--bg-surface)',
+                color: 'var(--text-main)',
                 padding: '5px 10px',
                 borderRadius: 20,
                 textDecoration: 'none',
                 fontSize: 12,
                 fontWeight: 600,
                 letterSpacing: '-0.2px',
-                border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.15)'}`,
+                border: '1px solid var(--border)',
                 transition: 'all 0.15s ease',
               }}
               className="github-nav-link"
               title="Support open source — Star repointxt on GitHub"
             >
-              <Icon name="github-fill" size={15} color={isDark ? '#f0f6fc' : '#1f2328'} />
+              <Icon name="github-fill" size={15} color="var(--text-main)" />
               <span style={{
                 fontSize: 12,
                 fontWeight: 600,
-                color: isDark ? '#f0f6fc' : '#1f2328',
+                color: 'var(--text-main)',
                 fontFamily: 'ui-sans-serif, system-ui, -apple-system, sans-serif'
               }}>
                 Star
@@ -289,8 +290,8 @@ export default function App() {
               <span style={{
                 fontSize: 11,
                 fontWeight: 700,
-                color: isDark ? '#38bdf8' : '#0550ae',
-                backgroundColor: isDark ? 'rgba(56, 189, 248, 0.12)' : 'rgba(5, 80, 174, 0.1)',
+                color: 'var(--primary-text)',
+                backgroundColor: 'var(--primary-tint)',
                 padding: '1px 6px',
                 borderRadius: 10,
                 marginLeft: 2,
@@ -482,11 +483,11 @@ export default function App() {
       </main>
 
       <footer style={{
-        borderTop: `1px solid ${colors.border}`,
+        borderTop: '1px solid var(--border)',
         padding: '20px',
         paddingBottom: 'calc(20px + env(safe-area-inset-bottom, 0px))',
         textAlign: 'center',
-        backgroundColor: isDark ? '#05070a' : '#fafafa',
+        backgroundColor: 'var(--bg-card)',
         display: 'flex',
         flexDirection: 'column',
         gap: 12,
@@ -504,10 +505,10 @@ export default function App() {
               key={href}
               href={href}
               style={{
-                color: isDark ? '#8b949e' : '#57606a',
+                color: 'var(--text-secondary)',
                 textDecoration: 'none',
                 fontWeight: 600,
-                borderBottom: `1px solid ${isDark ? 'rgba(139,148,158,0.35)' : 'rgba(87,96,106,0.35)'}`,
+                borderBottom: '1px solid var(--border)',
                 paddingBottom: 1
               }}
             >
@@ -515,7 +516,7 @@ export default function App() {
             </a>
           ))}
         </nav>
-        <div style={{ fontSize: 12.5, color: isDark ? '#8b949e' : '#57606a', display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap', justifyContent: 'center', lineHeight: 1.5 }}>
+        <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap', justifyContent: 'center', lineHeight: 1.5 }}>
           <span>Open-source utility by</span>
           <a
             href="https://github.com/CorbitLabs"
@@ -523,29 +524,29 @@ export default function App() {
             rel="noopener noreferrer"
             onClick={() => trackCompanyOutbound('footer')}
             style={{
-              color: isDark ? '#58a6ff' : '#0550ae',
+              color: 'var(--primary-text)',
               fontWeight: 700,
               textDecoration: 'none',
-              borderBottom: `1px dashed ${isDark ? '#58a6ff80' : '#0550ae80'}`,
+              borderBottom: '1px dashed var(--primary-text)',
               paddingBottom: 1
             }}
           >
             CorbitLabs
           </a>
-          <span style={{ fontSize: 11, color: isDark ? '#8b949e' : '#57606a' }}>(Corbit Technologies)</span>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>(Corbit Technologies)</span>
           <span>•</span>
           <a
             href="https://filefryer.com/?utm_source=repointxt&utm_medium=footer&utm_campaign=privacy_ecosystem"
             target="_blank"
             rel="noopener noreferrer"
             style={{
-              color: isDark ? '#8b949e' : '#57606a',
+              color: 'var(--text-secondary)',
               textDecoration: 'none',
               fontWeight: 600,
               transition: 'color 0.15s ease'
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = isDark ? '#38bdf8' : '#0550ae')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = isDark ? '#8b949e' : '#57606a')}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--primary-text)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-secondary)')}
           >
             FileFryer In-Browser Privacy Suite
           </a>
@@ -556,7 +557,7 @@ export default function App() {
             rel="noopener noreferrer"
             onClick={() => trackGitHubOutbound('footer')}
             style={{
-              color: isDark ? '#58a6ff' : '#0550ae',
+              color: 'var(--primary-text)',
               fontWeight: 600,
               textDecoration: 'none',
               display: 'inline-flex',
