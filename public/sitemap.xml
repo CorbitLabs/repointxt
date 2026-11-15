@@ -1,31 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://repointxt.corbit.tech/</loc>
+    <loc>https://repointxt.filefryer.com/</loc>
     <lastmod>2026-10-31</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://repointxt.corbit.tech/alternatives/repo2txt/</loc>
+    <loc>https://repointxt.filefryer.com/alternatives/repo2txt/</loc>
     <lastmod>2026-10-31</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://repointxt.corbit.tech/alternatives/gitingest/</loc>
+    <loc>https://repointxt.filefryer.com/alternatives/gitingest/</loc>
     <lastmod>2026-10-31</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://repointxt.corbit.tech/tools/github-to-claude/</loc>
+    <loc>https://repointxt.filefryer.com/tools/github-to-claude/</loc>
     <lastmod>2026-10-31</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://repointxt.corbit.tech/tools/github-to-gemini/</loc>
+    <loc>https://repointxt.filefryer.com/tools/github-to-gemini/</loc>
     <lastmod>2026-10-31</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>

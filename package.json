@@ -3,6 +3,14 @@
   "version": "1.0.0",
   "license": "MIT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/CorbitLabs/repointxt.git"
+  },
+  "homepage": "https://repointxt.filefryer.com",
+  "bugs": {
+    "url": "https://github.com/CorbitLabs/repointxt/issues"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

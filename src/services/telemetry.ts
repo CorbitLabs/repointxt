@@ -131,7 +131,7 @@ export const trackCompanyOutbound = (location: 'header_brand' | 'footer' | 'cta_
 export const trackGitHubOutbound = (location: 'header_star' | 'footer' | 'output_prompt') => {
   trackEvent('click_github_star', {
     placement: location,
-    destination: 'https://github.com/CorbitTechnologies/repointxt',
+    destination: 'https://github.com/CorbitLabs/repointxt',
   });
 };
 

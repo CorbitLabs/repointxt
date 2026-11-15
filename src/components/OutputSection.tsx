@@ -1,8 +1,9 @@
 // src/components/OutputSection.tsx
-import React, { memo, useState } from 'react';
+import React, { memo, useState, useEffect } from 'react';
 import { useTheme } from '../hooks/useTheme';
 import Icon from './Icon';
 import { trackEvent } from '../services/telemetry';
+import { getJSZip } from '../utils/jszip';
 
 interface OutputSectionProps {
   outputBatches: any[];
@@ -51,15 +52,25 @@ const OutputSection: React.FC<OutputSectionProps> = ({
   onClearOutput,
   isMobile,
 }) => {
-  const { colors, borderRadius, shadows } = useTheme();
+  const { colors, borderRadius, shadows, isDark } = useTheme();
   const [copied, setCopied] = useState(false);
   const [activeModelToast, setActiveModelToast] = useState<string | null>(null);
   const [showFullPreview, setShowFullPreview] = useState(false);
+  const [inlineNotification, setInlineNotification] = useState<string | null>(null);
 
-  if (!outputBatches || outputBatches.length === 0) return null;
+  const currentBatch = outputBatches?.[activeBatchIndex];
 
-  const currentBatch = outputBatches[activeBatchIndex];
-  if (!currentBatch) return null;
+  // Reset showFullPreview when batch changes
+  useEffect(() => {
+    setShowFullPreview(false);
+  }, [activeBatchIndex, currentBatch?.text]);
+
+  if (!outputBatches || outputBatches.length === 0 || !currentBatch) return null;
+
+  const showToast = (msg: string) => {
+    setInlineNotification(msg);
+    setTimeout(() => setInlineNotification(null), 3500);
+  };
 
   const isPreviewTruncated = !showFullPreview && currentBatch.text.length > PREVIEW_CHAR_LIMIT;
   const displayedText = isPreviewTruncated
@@ -78,7 +89,7 @@ const OutputSection: React.FC<OutputSectionProps> = ({
       setTimeout(() => setCopied(false), 2000);
       return true;
     } catch {
-      window.alert('Failed to copy to clipboard');
+      showToast('⚠️ Failed to copy to clipboard. Please select text manually.');
       return false;
     }
   };
@@ -96,6 +107,26 @@ const OutputSection: React.FC<OutputSectionProps> = ({
       tokens: currentBatch.tokenCount,
     });
     URL.revokeObjectURL(url);
+  };
+
+  const downloadAllPartsZip = async () => {
+    try {
+      const JSZip = await getJSZip();
+      const zip = new JSZip();
+      outputBatches.forEach((batch) => {
+        zip.file(`repointxt_part_${batch.part}_of_${batch.totalParts}.txt`, batch.text);
+      });
+      const content = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(content);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `repointxt_all_${outputBatches.length}_parts.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast(`📦 Downloaded all ${outputBatches.length} parts as ZIP archive`);
+    } catch {
+      showToast('⚠️ Failed to create ZIP bundle');
+    }
   };
 
   const launchAI = async (modelName: string, url: string) => {
@@ -126,6 +157,28 @@ const OutputSection: React.FC<OutputSectionProps> = ({
         position: 'relative',
       }}
     >
+      {inlineNotification && (
+        <div style={{
+          padding: '8px 12px',
+          backgroundColor: 'rgba(56, 139, 253, 0.15)',
+          border: '1px solid rgba(56, 139, 253, 0.3)',
+          borderRadius: 6,
+          color: '#58a6ff',
+          fontSize: 12,
+          fontWeight: 600,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <span>{inlineNotification}</span>
+          <button
+            onClick={() => setInlineNotification(null)}
+            style={{ background: 'none', border: 'none', color: '#58a6ff', cursor: 'pointer', padding: 0 }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
       {/* ── HEADER ROW: TITLE & METRICS ── */}
       <div
         style={{
@@ -245,11 +298,23 @@ const OutputSection: React.FC<OutputSectionProps> = ({
             <span>.txt</span>
           </button>
 
+          {outputBatches.length > 1 && (
+            <button
+              onClick={downloadAllPartsZip}
+              className="btn-secondary"
+              style={{ padding: '6px 10px', fontSize: '12px', borderRadius: '5px', gap: 4, borderColor: '#38bdf8', color: '#38bdf8' }}
+              title="Download all prompt parts as a single .zip"
+            >
+              <Icon name="download" size={13} color="#38bdf8" />
+              <span>All Parts (.zip)</span>
+            </button>
+          )}
+
           <button
             onClick={() => {
-              const badgeMarkdown = `[![Prompt with repointxt](https://img.shields.io/badge/Prompt_Context-repointxt-1f6feb?logo=github)](https://repointxt.corbit.tech)`;
+              const badgeMarkdown = `[![Prompt with repointxt](https://img.shields.io/badge/Prompt_Context-repointxt-1f6feb?logo=github)](https://repointxt.filefryer.com)`;
               navigator.clipboard.writeText(badgeMarkdown);
-              window.alert('Copied README badge markdown to clipboard!\n\n' + badgeMarkdown);
+              showToast('Copied README badge markdown to clipboard!');
             }}
             className="btn-secondary"
             style={{ padding: '6px 10px', fontSize: '12px', borderRadius: '5px', gap: 4 }}
@@ -286,14 +351,14 @@ const OutputSection: React.FC<OutputSectionProps> = ({
           display: 'flex',
           alignItems: 'center',
           gap: 6,
-          backgroundColor: 'rgba(13, 17, 23, 0.7)',
-          border: '1px solid rgba(255, 255, 255, 0.05)',
+          backgroundColor: 'var(--bg-recessed)',
+          border: '1px solid var(--border)',
           borderRadius: '6px',
           padding: isMobile ? '6px 8px' : '4px 8px',
           flexWrap: 'wrap',
         }}
       >
-        <span style={{ fontSize: '11px', color: '#8b949e', fontWeight: 600, marginRight: 2, width: isMobile ? '100%' : 'auto' }}>
+        <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600, marginRight: 2, width: isMobile ? '100%' : 'auto' }}>
           Launch in:
         </span>
 
@@ -301,9 +366,9 @@ const OutputSection: React.FC<OutputSectionProps> = ({
         <button
           onClick={() => launchAI('Claude 5.5', 'https://claude.ai/new')}
           style={{
-            background: 'rgba(217, 119, 6, 0.08)',
-            border: '1px solid rgba(217, 119, 6, 0.25)',
-            color: '#fbbf24',
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border)',
+            color: 'var(--text-main)',
             padding: isMobile ? '7px 10px' : '4px 9px',
             flex: isMobile ? '1 1 calc(50% - 6px)' : 'initial',
             borderRadius: '4px',
@@ -316,7 +381,9 @@ const OutputSection: React.FC<OutputSectionProps> = ({
           }}
           title="Open in Claude 5.5 (Supports 1M tokens)"
         >
-          <BrandIcons.Claude />
+          <span style={{ color: '#d97706', display: 'flex', alignItems: 'center' }}>
+            <BrandIcons.Claude />
+          </span>
           <span>Claude 5.5 (1M)</span>
         </button>
 
@@ -324,9 +391,9 @@ const OutputSection: React.FC<OutputSectionProps> = ({
         <button
           onClick={() => launchAI('ChatGPT (GPT-6)', 'https://chatgpt.com/')}
           style={{
-            background: 'rgba(16, 163, 127, 0.08)',
-            border: '1px solid rgba(16, 163, 127, 0.25)',
-            color: '#34d399',
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border)',
+            color: 'var(--text-main)',
             padding: isMobile ? '7px 10px' : '4px 9px',
             flex: isMobile ? '1 1 calc(50% - 6px)' : 'initial',
             borderRadius: '4px',
@@ -339,7 +406,9 @@ const OutputSection: React.FC<OutputSectionProps> = ({
           }}
           title="Open in ChatGPT (GPT-6 Astra supports 1.05M tokens)"
         >
-          <BrandIcons.ChatGPT />
+          <span style={{ color: '#10a37f', display: 'flex', alignItems: 'center' }}>
+            <BrandIcons.ChatGPT />
+          </span>
           <span>GPT-6 (1M)</span>
         </button>
 
@@ -347,9 +416,9 @@ const OutputSection: React.FC<OutputSectionProps> = ({
         <button
           onClick={() => launchAI('Gemini 4', 'https://gemini.google.com/app')}
           style={{
-            background: 'rgba(66, 133, 244, 0.12)',
-            border: '1px solid rgba(66, 133, 244, 0.35)',
-            color: '#70a5ff',
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border)',
+            color: 'var(--text-main)',
             padding: isMobile ? '7px 10px' : '4px 9px',
             flex: isMobile ? '1 1 calc(50% - 6px)' : 'initial',
             borderRadius: '4px',
@@ -362,7 +431,9 @@ const OutputSection: React.FC<OutputSectionProps> = ({
           }}
           title="Open in Gemini 4 Argon (1M tokens)"
         >
-          <BrandIcons.Gemini />
+          <span style={{ color: '#4285f4', display: 'flex', alignItems: 'center' }}>
+            <BrandIcons.Gemini />
+          </span>
           <span>Gemini 4 (1M)</span>
         </button>
 
@@ -370,9 +441,9 @@ const OutputSection: React.FC<OutputSectionProps> = ({
         <button
           onClick={() => launchAI('Google AI Studio', 'https://aistudio.google.com/prompts/new_chat')}
           style={{
-            background: 'rgba(56, 189, 248, 0.12)',
-            border: '1px solid rgba(56, 189, 248, 0.35)',
-            color: '#38bdf8',
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border)',
+            color: 'var(--text-main)',
             padding: isMobile ? '7px 10px' : '4px 9px',
             flex: isMobile ? '1 1 calc(50% - 6px)' : 'initial',
             borderRadius: '4px',
@@ -385,7 +456,9 @@ const OutputSection: React.FC<OutputSectionProps> = ({
           }}
           title="Google AI Studio (Gemini 4 Argon)"
         >
-          <BrandIcons.AIStudio />
+          <span style={{ color: '#0ea5e9', display: 'flex', alignItems: 'center' }}>
+            <BrandIcons.AIStudio />
+          </span>
           <span>AI Studio (1M)</span>
         </button>
       </div>
@@ -438,7 +511,7 @@ const OutputSection: React.FC<OutputSectionProps> = ({
       {/* Code Viewer Panel */}
       <div
         style={{
-          backgroundColor: '#090d13',
+          backgroundColor: 'var(--bg-recessed)',
           borderRadius: '6px',
           border: '1px solid var(--border)',
           overflow: 'hidden',
@@ -451,7 +524,7 @@ const OutputSection: React.FC<OutputSectionProps> = ({
               fontSize: isMobile ? '11px' : '12px',
               fontFamily: 'SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace',
               lineHeight: 1.55,
-              color: '#f0f6fc',
+              color: 'var(--text-main)',
               whiteSpace: 'pre-wrap',
               wordBreak: 'break-word',
             }}
@@ -463,7 +536,7 @@ const OutputSection: React.FC<OutputSectionProps> = ({
               type="button"
               onClick={() => setShowFullPreview(true)}
               className="btn-secondary"
-              style={{ marginTop: 10, width: '100%', padding: '6px', fontSize: '11.5px', color: '#58a6ff' }}
+              style={{ marginTop: 10, width: '100%', padding: '6px', fontSize: '11.5px', color: 'var(--primary-text)' }}
             >
               Preview truncated for instant rendering ({Math.round(currentBatch.text.length / 1024).toLocaleString()} KB total — Copy/Download includes 100%) · Click to expand full text
             </button>

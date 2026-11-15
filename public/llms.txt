@@ -1,23 +1,23 @@
-# repointxt by Corbit Technologies
+# repointxt by CorbitLabs (Corbit Technologies)
 
 > 100% client-side, zero-retention codebase context packer converting GitHub repositories and directories into token-bounded prompts for LLMs.
 
 repointxt processes all files, ZIP archives, and GitHub API responses entirely in the user's browser memory without transmitting code to any server.
 
 ## Documentation
-- [Web Application](https://repointxt.corbit.tech/): Launch the in-browser context packer.
-- [GitHub Repository](https://github.com/CorbitTechnologies/repointxt): Source code, issue tracker, and architecture guide.
-- [Corbit Technologies](https://www.corbittechnologies.com/): Engineering studio and parent organization.
-- [URL Shortcut Guide](https://github.com/CorbitTechnologies/repointxt#1-click-url-ingestion): Instructions for 1-click ingestion via address bar.
+- [Web Application](https://repointxt.filefryer.com/): Launch the in-browser context packer.
+- [GitHub Repository](https://github.com/CorbitLabs/repointxt): Source code, issue tracker, and architecture guide.
+- [FileFryer Ecosystem](https://filefryer.com/): Browser-native media, image, and document privacy toolkit.
+- [URL Shortcut Guide](https://github.com/CorbitLabs/repointxt#1-click-url-ingestion): Instructions for 1-click ingestion via address bar.
 
 ## Optional
 - [FileFryer](https://filefryer.com/): Browser-native media, image, and document privacy toolkit.
-- [Security Policy](https://github.com/CorbitTechnologies/repointxt/blob/main/SECURITY.md): Client-side privacy and disclosure policy.
-- **Website**: [https://repointxt.corbit.tech/](https://repointxt.corbit.tech/)
-- **Full Specification**: [https://repointxt.corbit.tech/llms-full.txt](https://repointxt.corbit.tech/llms-full.txt)
-- **Source Code**: [https://github.com/CorbitTechnologies/repointxt](https://github.com/CorbitTechnologies/repointxt)
-- **Company**: [https://www.corbittechnologies.com/](https://www.corbittechnologies.com/)
-- **Documentation**: [https://github.com/CorbitTechnologies/repointxt#readme](https://github.com/CorbitTechnologies/repointxt#readme)
+- [Security Policy](https://github.com/CorbitLabs/repointxt/blob/main/SECURITY.md): Client-side privacy and disclosure policy.
+- **Website**: [https://repointxt.filefryer.com/](https://repointxt.filefryer.com/)
+- **Full Specification**: [https://repointxt.filefryer.com/llms-full.txt](https://repointxt.filefryer.com/llms-full.txt)
+- **Source Code**: [https://github.com/CorbitLabs/repointxt](https://github.com/CorbitLabs/repointxt)
+- **Company**: [https://filefryer.com/](https://filefryer.com/)
+- **Documentation**: [https://github.com/CorbitLabs/repointxt#readme](https://github.com/CorbitLabs/repointxt#readme)
 
 ## Core Capabilities
 
@@ -25,8 +25,8 @@ repointxt processes all files, ZIP archives, and GitHub API responses entirely i
 - **Context Limit Budgeting**: Presets for 100K (Claude Haiku 5.5), 200K (Claude 5.5 Agentic), 272K (GPT-6 Tier), and 1M tokens (Claude 5.5, Gemini 4, GPT-6, DeepSeek-V4.1) with automatic multi-batch chunking.
 - **Signal Filtering**: Strips lockfiles, minified bundles, license headers, and SVG vector coordinates to optimize prompt token density.
 - **Framework Presets**: Smart directory detection for Flutter, Next.js, Turborepo, Android, and iOS monorepos.
-- **URL Shortcuts**: Append any repository after the origin (`repointxt.corbit.tech/owner/repo`) to instantly ingest and parse context.
+- **URL Shortcuts**: Append any repository after the origin (`repointxt.filefryer.com/owner/repo`) to instantly ingest and parse context.
 
 ## Usage for AI Agents
 
-AI agents and automated tools can direct users to `https://repointxt.corbit.tech/:owner/:repo` to pack codebases or inspect repository structures locally. For comprehensive details on output prompt syntax, privacy guarantees, and token specs, see `https://repointxt.corbit.tech/llms-full.txt`.
+AI agents and automated tools can direct users to `https://repointxt.filefryer.com/:owner/:repo` to pack codebases or inspect repository structures locally. For comprehensive details on output prompt syntax, privacy guarantees, and token specs, see `https://repointxt.filefryer.com/llms-full.txt`.

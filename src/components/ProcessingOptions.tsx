@@ -13,10 +13,9 @@ interface ProcessingOptionsProps {
 }
 
 const ProcessingOptions: React.FC<ProcessingOptionsProps> = ({ options, updateOption, isMobile }) => {
-  const { colors, borderRadius, isDark } = useTheme();
+  const { borderRadius } = useTheme();
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // The slider is index-based, so the presets and their hints live in constants.ts.
   const limitIndex = LLM_CONTEXT_LIMITS.findIndex(l => l.value === options.maxContextTokens);
   const activeLimit = limitIndex >= 0
     ? LLM_CONTEXT_LIMITS[limitIndex]
@@ -25,9 +24,9 @@ const ProcessingOptions: React.FC<ProcessingOptionsProps> = ({ options, updateOp
 
   return (
     <div style={{
-      backgroundColor: isDark ? 'rgba(22, 27, 34, 0.65)' : 'rgba(246, 248, 250, 0.8)',
+      backgroundColor: 'var(--bg-surface)',
       borderRadius: borderRadius.md,
-      border: `1px solid ${colors.border}`,
+      border: '1px solid var(--border)',
       overflow: 'hidden',
       marginTop: 12
     }}>
@@ -54,16 +53,16 @@ const ProcessingOptions: React.FC<ProcessingOptionsProps> = ({ options, updateOp
             width: 20,
             height: 20,
             borderRadius: 5,
-            backgroundColor: isDark ? `${colors.primary}18` : 'rgba(9, 105, 218, 0.1)',
+            backgroundColor: 'var(--primary-tint)',
             flexShrink: 0
           }}>
-            <Icon name="settings" size={11} color={isDark ? '#58a6ff' : '#0969da'} />
+            <Icon name="settings" size={11} color="var(--primary-text)" />
           </div>
           <span style={{
             fontSize: isMobile ? 12 : 12.5,
             fontWeight: '700',
             letterSpacing: -0.2,
-            color: colors.text,
+            color: 'var(--text-main)',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis'
@@ -75,16 +74,16 @@ const ProcessingOptions: React.FC<ProcessingOptionsProps> = ({ options, updateOp
           <span style={{
             fontSize: 10.5,
             fontWeight: '600',
-            color: isDark ? '#58a6ff' : '#0550ae',
-            backgroundColor: isDark ? 'rgba(56, 139, 253, 0.1)' : 'rgba(5, 80, 174, 0.08)',
+            color: 'var(--primary-text)',
+            backgroundColor: 'var(--primary-tint)',
             padding: '2px 7px',
             borderRadius: 4,
-            border: `1px solid ${isDark ? 'rgba(56, 139, 253, 0.25)' : 'rgba(5, 80, 174, 0.25)'}`,
+            border: '1px solid var(--border-strong)',
             fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace'
           }}>
-            {options.maxContextTokens >= 1000000 ? `${options.maxContextTokens / 1000000}M` : options.maxContextTokens > 0 ? `${options.maxContextTokens / 1000}K` : 'No Limit'}
+            {options.maxContextTokens === 0 ? 'Auto' : options.maxContextTokens >= 1000000 ? `${options.maxContextTokens / 1000000}M` : `${options.maxContextTokens / 1000}K`}
           </span>
-          <Icon name={isExpanded ? "chevron-down" : "chevron-right"} size={13} color={colors.textSecondary} />
+          <Icon name={isExpanded ? "chevron-down" : "chevron-right"} size={13} color="var(--text-secondary)" />
         </div>
       </button>
 
@@ -95,22 +94,22 @@ const ProcessingOptions: React.FC<ProcessingOptionsProps> = ({ options, updateOp
           flexDirection: 'column',
           gap: 14
         }}>
-          <div style={{ height: 1, backgroundColor: colors.border, width: '100%' }} />
+          <div style={{ height: 1, backgroundColor: 'var(--border)', width: '100%' }} />
 
           {/* ── TARGET LLM CONTEXT LIMIT SLIDER ── */}
           <div style={{
-            backgroundColor: isDark ? 'rgba(13, 17, 23, 0.6)' : 'rgba(255, 255, 255, 0.8)',
+            backgroundColor: 'var(--bg-recessed)',
             padding: '10px 12px',
             borderRadius: 8,
-            border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.05)' : colors.border}`
+            border: '1px solid var(--border)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 2 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 11.5, fontWeight: '700', color: colors.text }}>
+                <span style={{ fontSize: 11.5, fontWeight: '700', color: 'var(--text-main)' }}>
                   Target LLM Context Limit
                 </span>
                 {!isMobile && (
-                  <span style={{ fontSize: 10, color: isDark ? '#8b949e' : '#57606a' }}>
+                  <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
                     (Chunking threshold)
                   </span>
                 )}
@@ -120,21 +119,21 @@ const ProcessingOptions: React.FC<ProcessingOptionsProps> = ({ options, updateOp
                   fontSize: 11,
                   fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
                   fontWeight: 700,
-                  color: '#58a6ff',
-                  backgroundColor: 'rgba(56, 139, 253, 0.12)',
+                  color: 'var(--primary-text)',
+                  backgroundColor: 'var(--primary-tint)',
                   padding: '2px 8px',
                   borderRadius: 4,
-                  border: '1px solid rgba(56, 139, 253, 0.28)'
+                  border: '1px solid var(--border-strong)'
                 }}>
                   {activeLimit.value === 0
-                    ? 'No Limit'
+                    ? 'Auto (No Limit)'
                     : activeLimit.value >= 1000000
                       ? `${(activeLimit.value / 1000000).toFixed(1)}M tokens`
                       : `${Math.round(activeLimit.value / 1000)}k tokens`}
                 </span>
                 <span style={{
                   fontSize: 10.5,
-                  color: activeLimit.value >= 1000000 ? '#38bdf8' : '#3fb950',
+                  color: activeLimit.value === 0 ? 'var(--primary-text)' : activeLimit.value >= 1000000 ? 'var(--primary-text)' : 'var(--success-text)',
                   fontWeight: '600'
                 }}>
                   {activeLimit.hint}
@@ -159,7 +158,7 @@ const ProcessingOptions: React.FC<ProcessingOptionsProps> = ({ options, updateOp
               display: 'flex',
               justifyContent: 'space-between',
               fontSize: isMobile ? 8.5 : 10,
-              color: '#8b949e',
+              color: 'var(--text-muted)',
               marginTop: 2,
               padding: '0 2px'
             }}>
@@ -170,9 +169,9 @@ const ProcessingOptions: React.FC<ProcessingOptionsProps> = ({ options, updateOp
                     key={item.value}
                     style={{
                       cursor: 'pointer',
-                      color: isActive ? '#58a6ff' : '#8b949e',
+                      color: isActive ? 'var(--primary-text)' : 'var(--text-muted)',
                       fontWeight: isActive ? 700 : 500,
-                      padding: '2px 4px', // Touch-friendly tap surface
+                      padding: '2px 4px',
                     }}
                     onClick={() => updateOption('maxContextTokens', item.value)}
                   >
@@ -183,12 +182,12 @@ const ProcessingOptions: React.FC<ProcessingOptionsProps> = ({ options, updateOp
             </div>
           </div>
 
-          {/* ── ROW: OUTPUT FORMAT SWITCHER ── */}
+          {/* ── ROW: OUTPUT FORMAT SWITCHER & LINE NUMBERS ── */}
           <div style={{
-            backgroundColor: isDark ? 'rgba(13, 17, 23, 0.6)' : 'rgba(255, 255, 255, 0.8)',
+            backgroundColor: 'var(--bg-recessed)',
             padding: '10px 12px',
             borderRadius: 8,
-            border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.05)' : colors.border}`,
+            border: '1px solid var(--border)',
             display: 'flex',
             flexDirection: isMobile ? 'column' : 'row',
             justifyContent: 'space-between',
@@ -196,63 +195,70 @@ const ProcessingOptions: React.FC<ProcessingOptionsProps> = ({ options, updateOp
             gap: 8,
           }}>
             <div>
-              <div style={{ fontSize: 11.5, fontWeight: '700', color: colors.text }}>
+              <div style={{ fontSize: 11.5, fontWeight: '700', color: 'var(--text-main)' }}>
                 Prompt Output Format
               </div>
-              <div style={{ fontSize: 10, color: isDark ? '#8b949e' : '#57606a' }}>
+              <div style={{ fontSize: 10, color: 'var(--text-secondary)' }}>
                 XML tags for Claude 5.5 / GPT-6, or Markdown code blocks for DeepSeek / open models
               </div>
             </div>
-            <div style={{
-              display: 'inline-flex',
-              backgroundColor: isDark ? 'rgba(0, 0, 0, 0.3)' : 'rgba(0, 0, 0, 0.05)',
-              borderRadius: 6,
-              padding: 2,
-              border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)'}`
-            }}>
-              <button
-                type="button"
-                onClick={() => updateOption('outputFormat', 'xml')}
-                style={{
-                  border: 'none',
-                  borderRadius: 4,
-                  padding: '4px 12px',
-                  fontSize: 11,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  backgroundColor: (options.outputFormat || 'xml') === 'xml' ? (isDark ? '#21262d' : '#ffffff') : 'transparent',
-                  color: (options.outputFormat || 'xml') === 'xml' ? '#58a6ff' : colors.textSecondary,
-                  boxShadow: (options.outputFormat || 'xml') === 'xml' ? '0 1px 3px rgba(0,0,0,0.2)' : 'none',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                XML (&lt;file&gt;)
-              </button>
-              <button
-                type="button"
-                onClick={() => updateOption('outputFormat', 'markdown')}
-                style={{
-                  border: 'none',
-                  borderRadius: 4,
-                  padding: '4px 12px',
-                  fontSize: 11,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  backgroundColor: options.outputFormat === 'markdown' ? (isDark ? '#21262d' : '#ffffff') : 'transparent',
-                  color: options.outputFormat === 'markdown' ? '#58a6ff' : colors.textSecondary,
-                  boxShadow: options.outputFormat === 'markdown' ? '0 1px 3px rgba(0,0,0,0.2)' : 'none',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                Markdown (## File)
-              </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <Checkbox
+                label="Prepend Line Numbers"
+                checked={Boolean(options.includeLineNumbers)}
+                onChange={(val) => updateOption('includeLineNumbers', val)}
+              />
+              <div style={{
+                display: 'inline-flex',
+                backgroundColor: 'var(--bg-card)',
+                borderRadius: 6,
+                padding: 2,
+                border: '1px solid var(--border)'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => updateOption('outputFormat', 'xml')}
+                  style={{
+                    border: 'none',
+                    borderRadius: 4,
+                    padding: '4px 12px',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    backgroundColor: (options.outputFormat || 'xml') === 'xml' ? 'var(--primary)' : 'transparent',
+                    color: (options.outputFormat || 'xml') === 'xml' ? '#ffffff' : 'var(--text-secondary)',
+                    boxShadow: (options.outputFormat || 'xml') === 'xml' ? '0 1px 3px rgba(0,0,0,0.2)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  XML (&lt;file&gt;)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateOption('outputFormat', 'markdown')}
+                  style={{
+                    border: 'none',
+                    borderRadius: 4,
+                    padding: '4px 12px',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    backgroundColor: options.outputFormat === 'markdown' ? 'var(--primary)' : 'transparent',
+                    color: options.outputFormat === 'markdown' ? '#ffffff' : 'var(--text-secondary)',
+                    boxShadow: options.outputFormat === 'markdown' ? '0 1px 3px rgba(0,0,0,0.2)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  Markdown (## File)
+                </button>
+              </div>
             </div>
           </div>
 
           {/* ── ROW: CLEANING FLAGS & FILE SIZE LIMIT ── */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : '1.4fr 1fr',
+            gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
             gap: 12,
             alignItems: 'start'
           }}>
@@ -261,71 +267,135 @@ const ProcessingOptions: React.FC<ProcessingOptionsProps> = ({ options, updateOp
               display: 'flex',
               flexDirection: 'column',
               gap: 4,
-              backgroundColor: isDark ? 'rgba(13, 17, 23, 0.4)' : 'rgba(255, 255, 255, 0.8)',
+              backgroundColor: 'var(--bg-recessed)',
               padding: '8px 12px',
               borderRadius: 8,
-              border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.04)' : colors.border}`
+              border: '1px solid var(--border)'
             }}>
-              <span style={{ fontSize: 10.5, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, color: isDark ? '#8b949e' : '#57606a', marginBottom: 2 }}>
-                Token Compression
+              <span style={{ fontSize: 10.5, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--text-secondary)', marginBottom: 2 }}>
+                Token Compression Controls
               </span>
               <Checkbox
                 label="Strip Code Comments"
-                checked={options.removeComments}
+                checked={Boolean(options.removeComments)}
                 onChange={(val) => updateOption('removeComments', val)}
               />
               <Checkbox
                 label="Trim Redundant Whitespace"
-                checked={options.removeExtraWhitespace}
+                checked={Boolean(options.removeExtraWhitespace)}
                 onChange={(val) => updateOption('removeExtraWhitespace', val)}
+              />
+              <Checkbox
+                label="Strip License Headers"
+                checked={options.stripLicenseHeaders !== false}
+                onChange={(val) => updateOption('stripLicenseHeaders', val)}
+              />
+              <Checkbox
+                label="Stub SVG Vector Paths"
+                checked={options.stubSvgPaths !== false}
+                onChange={(val) => updateOption('stubSvgPaths', val)}
+              />
+              <Checkbox
+                label="Scan & Redact API Secrets"
+                checked={options.redactSecrets !== false}
+                onChange={(val) => updateOption('redactSecrets', val)}
               />
             </div>
 
-            {/* Single file threshold */}
+            {/* Aggressive Structural Compaction (Opt-in) */}
             <div style={{
               display: 'flex',
               flexDirection: 'column',
-              gap: 6,
-              backgroundColor: isDark ? 'rgba(13, 17, 23, 0.4)' : 'rgba(255, 255, 255, 0.8)',
+              gap: 4,
+              backgroundColor: 'var(--bg-recessed)',
               padding: '8px 12px',
               borderRadius: 8,
-              border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.04)' : colors.border}`
+              border: '1px solid var(--border)'
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 10.5, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, color: isDark ? '#8b949e' : '#57606a' }}>
-                  Max File Limit
-                </span>
-                <span style={{ fontSize: 11, fontFamily: 'monospace', color: colors.text, fontWeight: 600 }}>
-                  {options.maxFileSize} KB
-                </span>
-              </div>
-              <input
-                type="number"
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  backgroundColor: colors.surface,
-                  color: colors.text,
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: 6,
-                  padding: '5px 8px',
-                  fontSize: 12,
-                  outline: 'none'
-                }}
-                value={options.maxFileSize}
-                onChange={(e) => updateOption('maxFileSize', Number(e.target.value))}
-                placeholder="250"
+              <span style={{ fontSize: 10.5, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--text-secondary)', marginBottom: 2 }}>
+                Structural Compaction (Opt-In)
+              </span>
+              <Checkbox
+                label="Compact Tailwind Class Lists (>14)"
+                checked={Boolean(options.compactTailwindClasses)}
+                onChange={(val) => updateOption('compactTailwindClasses', val)}
               />
+              <Checkbox
+                label="Compact package.json Boilerplate"
+                checked={Boolean(options.refinePackageJson)}
+                onChange={(val) => updateOption('refinePackageJson', val)}
+              />
+              <Checkbox
+                label="Compact Supabase DB Types"
+                checked={Boolean(options.compactSupabaseTypes)}
+                onChange={(val) => updateOption('compactSupabaseTypes', val)}
+              />
+
+              <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 10.5, fontWeight: '700', color: 'var(--text-secondary)' }}>
+                    Max Single File Threshold
+                  </span>
+                  <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'var(--text-main)', fontWeight: 600 }}>
+                    {options.maxFileSize === 0 ? 'Unlimited' : `${options.maxFileSize} KB`}
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    backgroundColor: 'var(--bg-surface)',
+                    color: 'var(--text-main)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 6,
+                    padding: '5px 8px',
+                    fontSize: 12,
+                    outline: 'none'
+                  }}
+                  value={options.maxFileSize}
+                  onChange={(e) => updateOption('maxFileSize', Number(e.target.value))}
+                  placeholder="250 (0 for Unlimited)"
+                />
+              </div>
             </div>
+          </div>
+
+          {/* ── CUSTOM INSTRUCTIONS ── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <span style={{ fontSize: 11, fontWeight: '700', color: 'var(--text-main)' }}>
+              Custom Prompt Instructions (Optional)
+            </span>
+            <textarea
+              rows={2}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                backgroundColor: 'var(--bg-recessed)',
+                borderColor: 'var(--border)',
+                borderRadius: borderRadius.md,
+                padding: '7px 10px',
+                borderWidth: 1,
+                borderStyle: 'solid',
+                color: 'var(--text-main)',
+                fontSize: 12,
+                outline: 'none',
+                resize: 'vertical',
+                fontFamily: 'inherit'
+              }}
+              placeholder="e.g., Focus strictly on security audit, or prioritize Next.js App Router architectural conventions."
+              value={options.customInstructions || ''}
+              onChange={(e) => updateOption('customInstructions', e.target.value)}
+            />
           </div>
 
           {/* ── IGNORED PATTERNS CHIPS ── */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 11, fontWeight: '700', color: colors.text }}>
+              <span style={{ fontSize: 11, fontWeight: '700', color: 'var(--text-main)' }}>
                 Excluded Folders & Patterns
               </span>
-              <span style={{ fontSize: 10.5, color: isDark ? '#8b949e' : '#57606a' }}>
+              <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>
                 Type and hit Enter or comma to add
               </span>
             </div>

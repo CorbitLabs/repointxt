@@ -5,12 +5,12 @@ const PATTERNS = {
   jsComments: /(^|[^\S\r\n]|;|\})\/\/(?!\/)[^\r\n]*/g,
   hashComments: /(^|[^\S\r\n])#[^\r\n]*/g,
   htmlComments: /<!--[\s\S]*?-->/g,
-  pyDocDouble: /"""[\s\S]*?"""/g,
-  pyDocSingle: /'''[\s\S]*?'''/g,
+  pyDocDouble: /^\s*"""[\s\S]*?"""/gm,
+  pyDocSingle: /^\s*'''[\s\S]*?'''/gm,
   multiNewlines: /\n{3,}/g,
   spacesRun: /[ \t]+/g,
   trailingSpaces: /[ \t\r]+$/gm,
-  jsPreserveAndComments: /("(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*'|`(?:\\[\s\S]|[^`\\])*`|(?<![a-zA-Z0-9_$)\s])\/(?![/*])(?:\\.|[^/\n\\])+\/[gimsuy]*)|\/\*[\s\S]*?\*\/|(?:\s|^|\b)\/\/(?!\/)[^\r\n]*/g,
+  jsPreserveAndComments: /("(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*'|`(?:\\[\s\S]|[^`\\])*`|(?<![a-zA-Z0-9_$)\s])\/(?![/*])(?:\\.|[^/\n\\])+\/[gimsuy]*)|(?:\/\*[\s\S]*?\*\/)|(?:[^\S\r\n]|^|\b)\/\/(?!\/)[^\r\n]*/g,
   hashPreserveAndComments: /("(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*')|(^#!.*$)|((^|[^\S\r\n])#[^\r\n]*)/gm,
   licenseHeaders: /^(?:\/\*[\s\S]*?(?:copyright|license|all rights reserved)[\s\S]*?\*\/|\/\/(?:[^\n]*(?:copyright|license))[^\n]*\n*)+/i,
   svgPaths: /d="[MmLlHhVvCcSsQqTtAaZz0-9\s,\.\-]{40,}"/g,
@@ -27,7 +27,6 @@ const PATTERNS = {
 const JS_FAMILY = new Set(['.js', '.jsx', '.ts', '.tsx', '.java', '.c', '.cpp', '.cs', '.go', '.rs', '.swift', '.kt', '.php']);
 const HASH_FAMILY = new Set(['.py', '.sh', '.bash', '.yaml', '.yml', '.toml', '.rb', '.dockerfile']);
 
-// Only these can contain `className="..."` markup worth compacting.
 const TAILWIND_TARGET = /\.(tsx|jsx|html|htm|vue|svelte|astro|mdx)$/i;
 
 export const stripComments = (content: string, filePath: string): string => {
@@ -76,6 +75,7 @@ export const refinePackageJson = (content: string): string => {
       name: pkg.name,
       version: pkg.version,
       type: pkg.type,
+      private: pkg.private,
       workspaces: pkg.workspaces,
       main: pkg.main,
       module: pkg.module,
@@ -86,6 +86,14 @@ export const refinePackageJson = (content: string): string => {
       dependencies: pkg.dependencies,
       devDependencies: pkg.devDependencies,
       peerDependencies: pkg.peerDependencies,
+      optionalDependencies: pkg.optionalDependencies,
+      engines: pkg.engines,
+      packageManager: pkg.packageManager,
+      browserslist: pkg.browserslist,
+      prisma: pkg.prisma,
+      pnpm: pkg.pnpm,
+      overrides: pkg.overrides,
+      resolutions: pkg.resolutions,
     }, null, 2);
   } catch {
     return content;
@@ -107,7 +115,7 @@ export const compactTailwindClasses = (code: string): string => {
   return code.replace(PATTERNS.tailwindClassName, (match, quote, classes) => {
     const list = classes.trim().split(/\s+/);
     if (list.length > 14) {
-      return `className=${quote}${list.slice(0, 8).join(' ')} /* ...styles (${list.length - 8} more) */${quote}`;
+      return `className=${quote}${list.slice(0, 8).join(' ')} /* ...${list.length - 8} classes omitted */${quote}`;
     }
     return match;
   });
@@ -131,33 +139,55 @@ export const detectBoundary = (code: string): 'client' | 'server' | 'edge' | nul
   return null;
 };
 
+export interface TextOptimizeOptions {
+  removeComments?: boolean;
+  removeExtraWhitespace?: boolean;
+  stripLicenseHeaders?: boolean;
+  stubSvgPaths?: boolean;
+  compactTailwindClasses?: boolean;
+  refinePackageJson?: boolean;
+  compactSupabaseTypes?: boolean;
+  redactSecrets?: boolean;
+}
+
 export const optimizeContent = (
   content: string,
   filePath: string,
-  options: { removeComments?: boolean; removeExtraWhitespace?: boolean } = {}
+  options: TextOptimizeOptions = {}
 ): { content: string; redactedSecretsCount: number } => {
   let result = content;
 
-  if (filePath.endsWith('package.json')) {
+  if (options.refinePackageJson && filePath.endsWith('package.json')) {
     result = refinePackageJson(result);
   }
-  result = compactSupabaseTypes(result, filePath);
-  if (TAILWIND_TARGET.test(filePath)) {
+  if (options.compactSupabaseTypes) {
+    result = compactSupabaseTypes(result, filePath);
+  }
+  if (options.compactTailwindClasses && TAILWIND_TARGET.test(filePath)) {
     result = compactTailwindClasses(result);
   }
   if (options.removeComments) {
     result = stripComments(result, filePath);
   }
-  result = stripLicenseHeaders(result);
-  result = stubSvgPaths(result, filePath);
+  if (options.stripLicenseHeaders) {
+    result = stripLicenseHeaders(result);
+  }
+  if (options.stubSvgPaths) {
+    result = stubSvgPaths(result, filePath);
+  }
   if (options.removeExtraWhitespace) {
     result = compressWhitespace(result);
   }
 
-  const secretResult = scanAndRedactSecrets(result);
+  let redactedCount = 0;
+  if (options.redactSecrets !== false) {
+    const secretResult = scanAndRedactSecrets(result);
+    result = secretResult.content;
+    redactedCount = secretResult.redactedCount;
+  }
 
   return {
-    content: secretResult.content.trim(),
-    redactedSecretsCount: secretResult.redactedCount,
+    content: result.trim(),
+    redactedSecretsCount: redactedCount,
   };
 };

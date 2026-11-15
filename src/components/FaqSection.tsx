@@ -17,11 +17,11 @@ const FAQ_ITEMS: FAQItem[] = [
   },
   {
     question: "How do I pack a GitHub repository for Claude 5.5 or Gemini 4?",
-    answer: "Simply enter your GitHub repository URL (or append /owner/repo to repointxt.corbit.tech), select your target context window (e.g. 200K for Claude, 1M for Gemini 4 / GPT-6), select the files you want to include, and click Generate. repointxt will automatically create token-bounded XML prompt blocks ready to paste directly into your AI chat."
+    answer: "Simply enter your GitHub repository URL (or append /owner/repo to repointxt.filefryer.com), select your target context window (e.g. 200K for Claude, 1M for Gemini 4 / GPT-6), select the files you want to include, and click Generate. repointxt will automatically create token-bounded XML prompt blocks ready to paste directly into your AI chat."
   },
   {
     question: "Is there a 1-click Browser Bookmarklet to jump from GitHub to repointxt?",
-    answer: "Yes! Drag this link to your bookmarks bar: javascript:window.open('https://repointxt.corbit.tech/'+location.pathname.replace(/^\\//,'')). Clicking it while viewing any GitHub repository instantly opens repointxt and scans that repository."
+    answer: "Yes! Drag this link to your bookmarks bar: javascript:window.open('https://repointxt.filefryer.com/'+location.pathname.replace(/^\\//,'')). Clicking it while viewing any GitHub repository instantly opens repointxt and scans that repository."
   }
 ];
 
@@ -30,7 +30,7 @@ interface FaqSectionProps {
 }
 
 export const FaqSection: React.FC<FaqSectionProps> = ({ isDark = true }) => {
-  const [openIndexes, setOpenIndexes] = useState<Set<number>>(() => new Set([0, 1, 2]));
+  const [openIndexes, setOpenIndexes] = useState<Set<number>>(() => new Set());
 
   const toggleIndex = (index: number) => {
     setOpenIndexes(prev => {

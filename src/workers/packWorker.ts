@@ -1,12 +1,14 @@
 import { getJSZip } from '../utils/jszip';
-import { optimizeContent } from '../utils/textOptimizer';
+import { optimizeContent, TextOptimizeOptions } from '../utils/textOptimizer';
 import { sanitizeArchivePath } from '../services/githubService';
+import { shouldIgnore } from '../utils/fileHelpers';
 
 export interface UnzipRequest {
   type: 'UNZIP_ARCHIVE';
   id: string;
   file: File | Blob;
   maxFileSize: number;
+  ignorePatterns?: string;
 }
 
 export interface UnzipFileResult {
@@ -26,10 +28,7 @@ export interface OptimizeRequest {
   id: string;
   content: string;
   filePath: string;
-  options: {
-    removeComments?: boolean;
-    removeExtraWhitespace?: boolean;
-  };
+  options: TextOptimizeOptions;
 }
 
 export interface OptimizeResponse {
@@ -45,10 +44,7 @@ export interface BatchOptimizeRequest {
   type: 'BATCH_OPTIMIZE_CONTENT';
   id: string;
   items: Array<{ content: string; filePath: string }>;
-  options: {
-    removeComments?: boolean;
-    removeExtraWhitespace?: boolean;
-  };
+  options: TextOptimizeOptions;
 }
 
 export interface BatchOptimizeResultItem {
@@ -83,6 +79,9 @@ self.onmessage = async (e: MessageEvent<UnzipRequest | OptimizeRequest | BatchOp
       zip.forEach((relPath, entry) => {
         const cleanRelPath = sanitizeArchivePath(relPath);
         if (!cleanRelPath || entry.dir) return;
+
+        // Skip ignored files (node_modules, .git, images/videos) BEFORE decompressing text into memory
+        if (shouldIgnore(cleanRelPath, data.ignorePatterns)) return;
 
         promises.push(
           entry.async('text').then(text => {

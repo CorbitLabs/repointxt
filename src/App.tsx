@@ -14,7 +14,7 @@ import { trackCompanyOutbound, trackGitHubOutbound } from './services/telemetry'
 const SelectionComponent = lazy(() => import('./components/SelectionComponent'));
 const OutputSection = lazy(() => import('./components/OutputSection'));
 
-const GITHUB_REPO_URL = 'https://github.com/CorbitTechnologies/repointxt';
+const GITHUB_REPO_URL = 'https://github.com/CorbitLabs/repointxt';
 
 export default function App() {
   const [width, setWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
@@ -31,7 +31,7 @@ export default function App() {
   useEffect(() => {
     // Fetch GitHub stars during idle / deferred time to keep critical request chain clear
     const fetchStars = () => {
-      fetch('https://api.github.com/repos/CorbitTechnologies/repointxt')
+      fetch('https://api.github.com/repos/CorbitLabs/repointxt')
         .then(res => (res.ok ? res.json() : null))
         .then(data => {
           if (data && typeof data.stargazers_count === 'number') {
@@ -212,7 +212,7 @@ export default function App() {
       }}>
         <div style={{ maxWidth: 1040, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <BrandLogo size={isMobile ? 'sm' : 'md'} />
+            <BrandLogo size={isMobile ? 'sm' : 'md'} onReset={clearAll} />
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -232,6 +232,28 @@ export default function App() {
                 <span>API: <strong>{githubRateLimit.remaining}</strong>/{githubRateLimit.limit}</span>
               </div>
             )}
+            <button
+              type="button"
+              onClick={() => theme.setThemeMode(theme.isDark ? 'light' : 'dark')}
+              title={`Switch theme (currently ${theme.themeMode})`}
+              aria-label={`Switch theme (currently ${theme.themeMode})`}
+              style={{
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border)',
+                borderRadius: '6px',
+                padding: '4px 8px',
+                cursor: 'pointer',
+                color: 'var(--text-main)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                fontSize: '12px',
+                fontWeight: 600,
+              }}
+            >
+              <span>{theme.isDark ? '☀️ Light' : '🌙 Dark'}</span>
+            </button>
+
             <a
               href={GITHUB_REPO_URL}
               target="_blank"
@@ -494,9 +516,9 @@ export default function App() {
           ))}
         </nav>
         <div style={{ fontSize: 12.5, color: isDark ? '#8b949e' : '#57606a', display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap', justifyContent: 'center', lineHeight: 1.5 }}>
-          <span>In-browser privacy suite by</span>
+          <span>Open-source utility by</span>
           <a
-            href="https://www.corbittechnologies.com/?utm_source=repointxt&utm_medium=footer&utm_campaign=brand_attribution"
+            href="https://github.com/CorbitLabs"
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => trackCompanyOutbound('footer')}
@@ -508,8 +530,9 @@ export default function App() {
               paddingBottom: 1
             }}
           >
-            Corbit Technologies
+            CorbitLabs
           </a>
+          <span style={{ fontSize: 11, color: isDark ? '#8b949e' : '#57606a' }}>(Corbit Technologies)</span>
           <span>•</span>
           <a
             href="https://filefryer.com/?utm_source=repointxt&utm_medium=footer&utm_campaign=privacy_ecosystem"
@@ -524,7 +547,7 @@ export default function App() {
             onMouseEnter={(e) => (e.currentTarget.style.color = isDark ? '#38bdf8' : '#0550ae')}
             onMouseLeave={(e) => (e.currentTarget.style.color = isDark ? '#8b949e' : '#57606a')}
           >
-            FileFryer: In-Browser File &amp; Image Privacy Toolkit
+            FileFryer In-Browser Privacy Suite
           </a>
           <span>•</span>
           <a

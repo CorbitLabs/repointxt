@@ -4,7 +4,7 @@ import Icon from './Icon';
 import Checkbox from './Checkbox';
 import { FileItem, Source } from '../types';
 import { AVG_CHARS_PER_TOKEN, smartSelectFiles } from '../utils/fileHelpers';
-import { trackFileFryerOutbound } from '../services/telemetry';
+import { getGitHubProjectKey, getLocalProjectKey, saveSelectionPref } from '../utils/selectionStorage';
 
 interface Props {
   tree: FileItem[];
@@ -13,7 +13,7 @@ interface Props {
   onClearAll?: () => void;
   selectedFiles: FileItem[];
   setSelectedFiles: React.Dispatch<React.SetStateAction<FileItem[]>>;
-  onGenerate: () => Promise<void> | void;
+  onGenerate: () => Promise<{ success: boolean; copied: boolean } | void> | void;
   loading: boolean;
   isMobile?: boolean;
   maxContextTokens?: number;
@@ -247,10 +247,11 @@ export const SelectionComponent: React.FC<Props> = ({
     return Math.ceil(totalSelectedBytes / AVG_CHARS_PER_TOKEN);
   }, [totalSelectedBytes]);
 
-  const tokenLimit = maxContextTokens || 200000;
-  const tokenPercentage = Math.min(100, Math.round((totalEstimatedTokens / tokenLimit) * 100));
-  const isTokenWarning = totalEstimatedTokens > tokenLimit * 0.8;
-  const isTokenExceeded = totalEstimatedTokens > tokenLimit;
+  const isNoLimit = maxContextTokens === 0;
+  const tokenLimit = isNoLimit ? 0 : (maxContextTokens || 1000000);
+  const tokenPercentage = isNoLimit ? 0 : Math.min(100, Math.round((totalEstimatedTokens / tokenLimit) * 100));
+  const isTokenWarning = !isNoLimit && totalEstimatedTokens > tokenLimit * 0.8;
+  const isTokenExceeded = !isNoLimit && totalEstimatedTokens > tokenLimit;
 
   const [justGenerated, setJustGenerated] = useState(false);
   const [lastElapsedMs, setLastElapsedMs] = useState<number | null>(null);
@@ -274,17 +275,19 @@ export const SelectionComponent: React.FC<Props> = ({
     if (selectedFiles.length === 0 || loading) return;
     const t0 = performance.now();
     try {
-      await onGenerate();
+      const res = await onGenerate();
       const duration = Math.round(performance.now() - t0);
       setLastElapsedMs(duration);
-      setJustGenerated(true);
-      setCopiedNotification(true);
-      setTimeout(() => {
-        setJustGenerated(false);
-      }, 2500);
-      setTimeout(() => {
-        setCopiedNotification(false);
-      }, 3500);
+      if (res && typeof res === 'object' && 'copied' in res && res.copied) {
+        setJustGenerated(true);
+        setCopiedNotification(true);
+        setTimeout(() => {
+          setJustGenerated(false);
+        }, 2500);
+        setTimeout(() => {
+          setCopiedNotification(false);
+        }, 3500);
+      }
     } catch (e) {
       console.error(e);
     }
@@ -364,6 +367,18 @@ export const SelectionComponent: React.FC<Props> = ({
       return;
     }
   };
+
+  // Persist user selection changes locally per repository / folder
+  useEffect(() => {
+    if (sources.length === 1 && tree.length > 0) {
+      const primarySource = sources[0];
+      const projectKey = primarySource.type === 'github' && primarySource.owner && primarySource.repo
+        ? getGitHubProjectKey(primarySource.owner, primarySource.repo)
+        : getLocalProjectKey(primarySource.name, tree);
+      const preset = activePreset || 'custom';
+      saveSelectionPref(projectKey, preset, selectedFiles, tree);
+    }
+  }, [selectedFiles, activePreset, sources, tree]);
 
   const formatSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
@@ -499,101 +514,95 @@ export const SelectionComponent: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* ── PRESET ACTION BUTTONS WITH ACTIVE STATE ── */}
+        {/* ── SEGMENTED PRESET PILL GROUP ── */}
         <div style={{
-          display: 'flex',
-          gap: 5,
-          flexWrap: 'wrap',
+          display: 'inline-flex',
           alignItems: 'center',
+          backgroundColor: 'rgba(255, 255, 255, 0.03)',
+          border: '1px solid var(--border)',
+          borderRadius: '6px',
+          padding: '2px',
           marginTop: isMobile ? 6 : 0,
         }}>
           <button
             onClick={() => applyPreset('core')}
-            className="btn-secondary"
+            type="button"
             style={{
-              flex: isMobile ? '1 1 auto' : 'initial',
-              padding: isMobile ? '6px 10px' : '4px 9px',
-              fontSize: isMobile ? '12px' : '11.5px',
-              minHeight: isMobile ? 32 : 'auto',
-              backgroundColor: activePreset === 'core' ? 'rgba(31, 111, 235, 0.2)' : 'var(--bg-surface)',
-              borderColor: activePreset === 'core' ? '#388bfd' : 'var(--border)',
-              color: activePreset === 'core' ? '#58a6ff' : '#c9d1d9',
+              background: activePreset === 'core' ? '#1f6feb' : 'transparent',
+              border: 'none',
+              borderRadius: '4px',
+              padding: '3px 8px',
+              fontSize: '11.5px',
+              fontWeight: 600,
+              color: activePreset === 'core' ? '#ffffff' : '#8b949e',
+              cursor: 'pointer',
+              transition: 'all 0.12s ease'
             }}
           >
-            🎯 Core Code
+            Core Code
           </button>
           <button
             onClick={() => applyPreset('all')}
-            className="btn-secondary"
+            type="button"
             style={{
-              flex: isMobile ? '1 1 auto' : 'initial',
-              padding: isMobile ? '6px 10px' : '4px 9px',
-              fontSize: isMobile ? '12px' : '11.5px',
-              minHeight: isMobile ? 32 : 'auto',
-              backgroundColor: activePreset === 'all' ? 'rgba(31, 111, 235, 0.2)' : 'var(--bg-surface)',
-              borderColor: activePreset === 'all' ? '#388bfd' : 'var(--border)',
-              color: activePreset === 'all' ? '#58a6ff' : '#c9d1d9',
+              background: activePreset === 'all' ? '#1f6feb' : 'transparent',
+              border: 'none',
+              borderRadius: '4px',
+              padding: '3px 8px',
+              fontSize: '11.5px',
+              fontWeight: 600,
+              color: activePreset === 'all' ? '#ffffff' : '#8b949e',
+              cursor: 'pointer',
+              transition: 'all 0.12s ease'
             }}
           >
-            Select All
+            All
           </button>
           <button
             onClick={() => applyPreset('none')}
-            className="btn-secondary"
+            type="button"
             style={{
-              flex: isMobile ? '1 1 auto' : 'initial',
-              padding: isMobile ? '6px 10px' : '4px 9px',
-              fontSize: isMobile ? '12px' : '11.5px',
-              minHeight: isMobile ? 32 : 'auto',
-              color: '#8b949e',
+              background: activePreset === 'none' ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
+              border: 'none',
+              borderRadius: '4px',
+              padding: '3px 8px',
+              fontSize: '11.5px',
+              fontWeight: 600,
+              color: activePreset === 'none' ? '#ffffff' : '#8b949e',
+              cursor: 'pointer',
+              transition: 'all 0.12s ease'
             }}
           >
-            Deselect
+            None
           </button>
-          {onClearAll && (
-            <button
-              onClick={onClearAll}
-              className="btn-secondary"
-              style={{
-                flex: isMobile ? '1 1 auto' : 'initial',
-                padding: isMobile ? '6px 10px' : '4px 9px',
-                fontSize: isMobile ? '12px' : '11.5px',
-                minHeight: isMobile ? 32 : 'auto',
-                color: '#f85149',
-                borderColor: 'rgba(248, 81, 73, 0.3)',
-                backgroundColor: 'rgba(248, 81, 73, 0.08)',
-              }}
-            >
-              <Icon name="x" size={11} color="#f85149" />
-              <span>Clear</span>
-            </button>
-          )}
         </div>
       </div>
 
       {/* ── VISUAL TOKEN BUDGET CONSUMPTION BAR ── */}
       <div style={{
-        backgroundColor: 'rgba(22, 27, 34, 0.75)',
+        backgroundColor: 'var(--bg-recessed)',
         border: '1px solid var(--border)',
         borderRadius: '6px',
         padding: '6px 10px'
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#8b949e', marginBottom: 5 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: 'var(--text-muted)', marginBottom: 5 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <span style={{ fontWeight: 500, color: '#c9d1d9' }}>Token Budget Consumption</span>
-            <span style={{ fontSize: '9.5px', backgroundColor: 'rgba(255, 255, 255, 0.08)', padding: '1px 5px', borderRadius: '3px', color: '#8b949e' }}>
-              {tokenLimit >= 1000000 ? `${(tokenLimit / 1000000).toFixed(1)}M limit` : `${Math.round(tokenLimit / 1000)}k limit`}
+            <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>Token Budget Consumption</span>
+            <span style={{ fontSize: '9.5px', backgroundColor: 'var(--bg-surface)', padding: '1px 5px', borderRadius: '3px', color: 'var(--text-muted)' }}>
+              {isNoLimit ? 'Auto / No Limit' : tokenLimit >= 1000000 ? `${(tokenLimit / 1000000).toFixed(1)}M limit` : `${Math.round(tokenLimit / 1000)}k limit`}
             </span>
           </div>
-          <span style={{ color: isTokenExceeded ? '#f85149' : isTokenWarning ? '#e3b341' : '#58a6ff', fontWeight: 600, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: '11px' }}>
-            {totalEstimatedTokens.toLocaleString()} / {tokenLimit >= 1000000 ? `${(tokenLimit / 1000000).toFixed(1)}M` : `${Math.round(tokenLimit / 1000)}k`} ({tokenPercentage}%)
+          <span style={{ color: isTokenExceeded ? 'var(--danger-text)' : isTokenWarning ? 'var(--warning-text)' : 'var(--primary-text)', fontWeight: 600, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: '11px' }}>
+            {isNoLimit
+              ? `${totalEstimatedTokens.toLocaleString()} tokens (Single Batch)`
+              : `${totalEstimatedTokens.toLocaleString()} / ${tokenLimit >= 1000000 ? `${(tokenLimit / 1000000).toFixed(1)}M` : `${Math.round(tokenLimit / 1000)}k`} (${tokenPercentage}%)`}
           </span>
         </div>
-        <div style={{ width: '100%', height: '5px', backgroundColor: 'rgba(255, 255, 255, 0.06)', borderRadius: '3px', overflow: 'hidden' }}>
+        <div style={{ width: '100%', height: '5px', backgroundColor: 'var(--bg-surface)', borderRadius: '3px', overflow: 'hidden' }}>
           <div style={{
-            width: `${tokenPercentage}%`,
+            width: isNoLimit ? '100%' : `${tokenPercentage}%`,
             height: '100%',
-            backgroundColor: isTokenExceeded ? '#f85149' : isTokenWarning ? '#e3b341' : '#238636',
+            backgroundColor: isNoLimit ? 'var(--primary)' : isTokenExceeded ? 'var(--danger-text)' : isTokenWarning ? 'var(--warning-text)' : 'var(--success)',
             borderRadius: '3px',
             transition: 'width 0.25s ease-out'
           }} />
@@ -602,7 +611,7 @@ export const SelectionComponent: React.FC<Props> = ({
 
       {/* ── ACTIVE SOURCE BADGES (Visible for all loaded sources) ── */}
       {sources.length > 0 && (
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
           {sources.map(s => (
             <div key={s.id} style={{
               display: 'inline-flex',
@@ -626,6 +635,25 @@ export const SelectionComponent: React.FC<Props> = ({
               </button>
             </div>
           ))}
+          {onClearAll && (
+            <button
+              onClick={onClearAll}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: '2px 6px',
+                cursor: 'pointer',
+                color: '#8b949e',
+                fontSize: '11px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 3
+              }}
+              title="Clear all workspace sources"
+            >
+              <span>Clear Workspace</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -639,11 +667,11 @@ export const SelectionComponent: React.FC<Props> = ({
             placeholder={isMobile ? 'Filter files...' : 'Filter files by name or path (e.g. lib, .dart, auth)...'}
             style={{
               width: '100%',
-              backgroundColor: '#0d1117',
+              backgroundColor: 'var(--bg-recessed)',
               border: '1px solid var(--border)',
               borderRadius: '6px',
               padding: '6px 10px 6px 28px',
-              color: '#f0f6fc',
+              color: 'var(--text-main)',
               fontSize: '12.5px',
               outline: 'none',
               boxSizing: 'border-box',
@@ -651,7 +679,7 @@ export const SelectionComponent: React.FC<Props> = ({
             }}
           />
           <div style={{ position: 'absolute', left: '9px', top: '7px', pointerEvents: 'none' }}>
-            <Icon name="search" size={12} color="#6e7681" />
+            <Icon name="search" size={12} color="var(--text-muted)" />
           </div>
           {filterQuery && (
             <button
@@ -662,7 +690,7 @@ export const SelectionComponent: React.FC<Props> = ({
                 top: '6px',
                 background: 'none',
                 border: 'none',
-                color: '#8b949e',
+                color: 'var(--text-muted)',
                 cursor: 'pointer',
                 fontSize: '11px'
               }}
@@ -680,7 +708,7 @@ export const SelectionComponent: React.FC<Props> = ({
           style={{ padding: isMobile ? '7px 8px' : '5px 9px', flexShrink: 0, fontSize: '11.5px', borderRadius: '5px' }}
           title="Expand all folders"
         >
-          <Icon name="chevron-down" size={11} color="#8b949e" />
+          <Icon name="chevron-down" size={11} color="var(--text-secondary)" />
           {!isMobile && <span>Expand</span>}
         </button>
         <button
@@ -690,7 +718,7 @@ export const SelectionComponent: React.FC<Props> = ({
           style={{ padding: isMobile ? '7px 8px' : '5px 9px', flexShrink: 0, fontSize: '11.5px', borderRadius: '5px' }}
           title="Collapse all folders"
         >
-          <Icon name="chevron-right" size={11} color="#8b949e" />
+          <Icon name="chevron-right" size={11} color="var(--text-secondary)" />
           {!isMobile && <span>Collapse</span>}
         </button>
       </div>
@@ -704,7 +732,7 @@ export const SelectionComponent: React.FC<Props> = ({
         onKeyDown={handleTreeKeyDown}
         className="tree-container"
         style={{
-          backgroundColor: '#090d13',
+          backgroundColor: 'var(--bg-recessed)',
           border: '1px solid var(--border)',
           borderRadius: '7px',
           maxHeight: '340px',
@@ -715,7 +743,7 @@ export const SelectionComponent: React.FC<Props> = ({
         }}
       >
         {visibleRows.length === 0 ? (
-          <div style={{ padding: '36px', textAlign: 'center', color: '#8b949e', fontSize: '13px' }}>
+          <div style={{ padding: '36px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
             No files match "{filterQuery}"
           </div>
         ) : (
@@ -750,10 +778,10 @@ export const SelectionComponent: React.FC<Props> = ({
                   aria-selected={Boolean(isChecked)}
                   tabIndex={isFocused ? 0 : -1}
                   className="tree-row"
-                  onClick={() => {
+                  onClick={(e) => {
                     setFocusedIndex(rowIndex);
                     if (isFolder) {
-                      toggleFolderSelection(row);
+                      toggleFolderCollapse(row.key, e);
                     } else if (row.item) {
                       toggleFileSelection(row.item);
                     }
@@ -842,7 +870,7 @@ export const SelectionComponent: React.FC<Props> = ({
                         <span style={{
                           fontWeight: 600,
                           fontSize: isMobile ? '12.5px' : '13px',
-                          color: '#f0f6fc',
+                          color: 'var(--text-main)',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap'
@@ -853,7 +881,7 @@ export const SelectionComponent: React.FC<Props> = ({
                           <span style={{
                             fontSize: '9px',
                             backgroundColor: 'rgba(227, 179, 65, 0.12)',
-                            color: '#e3b341',
+                            color: 'var(--warning-text)',
                             border: '1px solid rgba(227, 179, 65, 0.25)',
                             padding: '1px 5px',
                             borderRadius: '4px',
@@ -867,7 +895,7 @@ export const SelectionComponent: React.FC<Props> = ({
                           <span style={{
                             fontSize: '9px',
                             backgroundColor: 'rgba(56, 189, 248, 0.12)',
-                            color: '#38bdf8',
+                            color: 'var(--primary-text)',
                             border: '1px solid rgba(56, 189, 248, 0.25)',
                             padding: '1px 5px',
                             borderRadius: '4px',
@@ -880,13 +908,13 @@ export const SelectionComponent: React.FC<Props> = ({
                       </div>
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flex: 1 }}>
-                        <Icon name="file" size={13} color="#6e7681" />
+                        <Icon name="file" size={13} color="var(--text-muted)" />
                         <span style={{
                           fontSize: isMobile ? '12px' : '12.5px',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
-                          color: isChecked ? '#f0f6fc' : '#c9d1d9',
+                          color: isChecked ? 'var(--text-main)' : 'var(--text-secondary)',
                           fontWeight: isChecked ? 500 : 400
                         }}>
                           {row.name}
@@ -896,7 +924,7 @@ export const SelectionComponent: React.FC<Props> = ({
                   </div>
 
                   {/* Size & Token Badges */}
-                  <div style={{ fontSize: '11px', color: '#8b949e', flexShrink: 0, marginLeft: '8px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0, marginLeft: '8px' }}>
                     {isFolder ? (
                       <span style={{
                         backgroundColor: 'rgba(255, 255, 255, 0.04)',
@@ -944,35 +972,6 @@ export const SelectionComponent: React.FC<Props> = ({
           <span>Context bundle copied directly to clipboard! (~{totalEstimatedTokens.toLocaleString()} tokens)</span>
         </div>
       )}
-
-      {/* ── CORBIT PRIVACY ECOSYSTEM: FILEFRYER CROSS-PROMOTION ── */}
-      <div style={{
-        marginTop: 10,
-        marginBottom: 8,
-        padding: '7px 12px',
-        backgroundColor: 'rgba(255, 255, 255, 0.025)',
-        borderRadius: '6px',
-        border: '1px solid rgba(255, 255, 255, 0.06)',
-        fontSize: '11.5px',
-        color: '#8b949e',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '6px'
-      }}>
-        <span>Need to convert or compress non-code PDFs, images, or media in this repository?</span>
-        <a
-          href="https://filefryer.com/?utm_source=repointxt&utm_medium=asset_banner&utm_campaign=privacy_ecosystem"
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={() => trackFileFryerOutbound('selection_banner')}
-          style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3 }}
-        >
-          <span>Open FileFryer (100% In-Browser &amp; Private)</span>
-          <span style={{ fontSize: '10px' }}>↗</span>
-        </a>
-      </div>
 
       {/* ── STICKY PRIMARY ACTION BAR ── */}
       <div style={{

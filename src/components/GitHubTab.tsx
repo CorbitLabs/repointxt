@@ -23,7 +23,7 @@ const GitHubTab: React.FC<GitHubTabProps> = (props) => {
 
   return (
     <div style={{ width: '100%' }}>
-      <SourceInputs {...props} />
+      <SourceInputs {...props} onSubmit={() => props.fetchGitHubRepo(false)} />
       <div style={{
         display: 'flex',
         flexDirection: props.isMobile ? 'column' : 'row',

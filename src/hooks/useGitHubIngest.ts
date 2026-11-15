@@ -4,6 +4,7 @@ import { parseGitHubSlug, fetchTreeData, fetchRepoZipball, clearAllRepoZipCaches
 import { trackEvent, measurePerformance, logCrash } from '../services/telemetry';
 import { Source, FileItem, ProcessingOptionsState } from '../types';
 import { shouldIgnore, smartSelectFiles } from '../utils/fileHelpers';
+import { getGitHubProjectKey, loadSelectionPref } from '../utils/selectionStorage';
 
 export interface UseGitHubIngestParams {
   options: ProcessingOptionsState;
@@ -58,14 +59,20 @@ export const useGitHubIngest = ({
     const targetSourceId = `gh-${Date.now()}`;
 
     try {
-      const { owner, repo } = parseGitHubSlug(urlToFetch);
+      const parsed = parseGitHubSlug(urlToFetch);
+      const { owner, repo, branch: urlBranch, subpath } = parsed;
+      const effectiveBranch = (urlBranch || githubBranch).trim();
+      if (urlBranch && !githubBranch) {
+        setGithubBranch(urlBranch);
+      }
+
       const { branch: activeBranch, tree } = await measurePerformance('github_repo_ingest', async () => {
         try {
           setLoadingMessage('Streaming repository archive...');
           return await fetchRepoZipball(
             owner,
             repo,
-            githubBranch.trim(),
+            effectiveBranch,
             githubToken,
             (rem, lim) => setGithubRateLimit({ remaining: rem, limit: lim }),
             targetSourceId
@@ -76,7 +83,7 @@ export const useGitHubIngest = ({
           return await fetchTreeData(
             owner,
             repo,
-            githubBranch.trim(),
+            effectiveBranch,
             githubToken,
             (rem, lim) => setGithubRateLimit({ remaining: rem, limit: lim }),
             targetSourceId
@@ -87,6 +94,7 @@ export const useGitHubIngest = ({
       const maxBytes = Number(options.maxFileSize) * 1024;
       const validTreeItems: FileItem[] = tree.filter((i: any) => {
         if (i.type !== 'blob') return false;
+        if (subpath && !i.path.startsWith(subpath)) return false;
         if (shouldIgnore(i.path, options.ignorePatterns)) return false;
         if (typeof i.size === 'number' && i.size > maxBytes) return false;
         return true;
@@ -96,6 +104,9 @@ export const useGitHubIngest = ({
         sourceId: targetSourceId
       }));
 
+      const projectKey = getGitHubProjectKey(owner, repo);
+      const savedSelections = loadSelectionPref(projectKey, validTreeItems);
+
       const newSource: Source = {
         id: targetSourceId,
         type: 'github',
@@ -104,7 +115,7 @@ export const useGitHubIngest = ({
         repo,
         branch: activeBranch,
         tree: validTreeItems,
-        selectedFiles: smartSelectFiles(validTreeItems)
+        selectedFiles: savedSelections !== null ? savedSelections : smartSelectFiles(validTreeItems)
       };
 
       setSources(prev => isAdding ? [...prev, newSource] : [newSource]);
@@ -166,13 +177,10 @@ export const useGitHubIngest = ({
 
       const repoSlugMatch = cleanPath.match(/^([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)$/);
 
-      if (
-        repoSlugMatch &&
-        !repoSlugMatch[0].startsWith('assets') &&
-        !repoSlugMatch[0].startsWith('static') &&
-        !repoSlugMatch[0].startsWith('tools') &&
-        !repoSlugMatch[0].startsWith('alternatives')
-      ) {
+      const EXCLUDED_PREFIXES = new Set(['assets', 'static', 'tools', 'alternatives']);
+      const isExcludedRoute = repoSlugMatch && EXCLUDED_PREFIXES.has(repoSlugMatch[1].toLowerCase());
+
+      if (repoSlugMatch && !isExcludedRoute) {
         const slug = `${repoSlugMatch[1]}/${repoSlugMatch[2]}`;
         document.title = `Pack ${slug} into LLM Context | repointxt`;
         const metaDesc = document.querySelector('meta[name="description"]');
@@ -182,10 +190,20 @@ export const useGitHubIngest = ({
             `Generate token-optimized prompt bundles for ${slug}. In-browser client-side packing for Claude, Gemini, and ChatGPT.`
           );
         }
+        // Set dynamic noindex on repo route to preserve search crawl budget
+        let robotsMeta = document.querySelector('meta[name="robots"]');
+        if (robotsMeta) {
+          robotsMeta.setAttribute('content', 'noindex, follow');
+        }
         setGithubUrl(slug);
         setActiveTab('github');
         fetchGitHubRepo(false, slug);
       } else if (!isInitial && cleanPath === '') {
+        document.title = 'repointxt by FileFryer / Corbit | GitHub & Codebase to LLM Prompt Generator (repo2txt Alternative)';
+        let robotsMeta = document.querySelector('meta[name="robots"]');
+        if (robotsMeta) {
+          robotsMeta.setAttribute('content', 'index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1');
+        }
         setSources([]);
         setOutputBatches([]);
       }

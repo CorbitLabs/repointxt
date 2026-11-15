@@ -21,7 +21,7 @@ Thank you for your interest in contributing to **repointxt** by [Corbit Technolo
 ### Setup
 ```bash
 # 1. Clone the repository
-git clone https://github.com/CorbitTechnologies/repointxt.git
+git clone https://github.com/CorbitLabs/repointxt.git
 cd repointxt
 
 # 2. Install dependencies

@@ -1,19 +1,19 @@
 {
   "specVersion": "1.0",
   "host": {
-    "displayName": "Corbit Technologies",
-    "documentationUrl": "https://repointxt.corbit.tech",
-    "logoUrl": "https://repointxt.corbit.tech/logo-192.png"
+    "displayName": "FileFryer / Corbit",
+    "documentationUrl": "https://repointxt.filefryer.com",
+    "logoUrl": "https://repointxt.filefryer.com/logo-192.png"
   },
   "entries": [
     {
-      "identifier": "urn:air:corbit.tech:repointxt:codebase-context-packer",
+      "identifier": "urn:air:filefryer.com:repointxt:codebase-context-packer",
       "displayName": "repointxt Codebase Context Packer",
       "type": "application/agent-card+json",
-      "url": "https://repointxt.corbit.tech",
+      "url": "https://repointxt.filefryer.com",
       "description": "100% Client-side GitHub and codebase context packer for AI models and LLM prompts.",
       "version": "1.0.0",
-      "updatedAt": "2026-10-14T20:30:00Z",
+      "updatedAt": "2026-10-31T20:30:00Z",
       "tags": [
         "developer-tool",
         "codebase-to-prompt",

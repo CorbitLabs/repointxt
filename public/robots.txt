@@ -19,5 +19,5 @@ Allow: /
 User-agent: Google-Extended
 Allow: /
 
-Sitemap: https://repointxt.corbit.tech/sitemap.xml
-# Agentmap: https://repointxt.corbit.tech/ai-catalog.json
+Sitemap: https://repointxt.filefryer.com/sitemap.xml
+# Agentmap: https://repointxt.filefryer.com/ai-catalog.json

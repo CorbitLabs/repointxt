@@ -44,8 +44,16 @@ export type OutputFormat = 'xml' | 'markdown';
 export interface ProcessingOptionsState {
   removeComments: boolean;
   removeExtraWhitespace: boolean;
+  stripLicenseHeaders: boolean;
+  stubSvgPaths: boolean;
+  compactTailwindClasses: boolean;
+  refinePackageJson: boolean;
+  compactSupabaseTypes: boolean;
+  redactSecrets: boolean;
   maxContextTokens: number;
   maxFileSize: number;
   ignorePatterns: string;
   outputFormat: OutputFormat;
+  includeLineNumbers: boolean;
+  customInstructions?: string;
 }

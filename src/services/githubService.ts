@@ -6,8 +6,28 @@ export interface GitHubRepoMeta {
   defaultBranch: string;
 }
 
-export const parseGitHubSlug = (input: string): { owner: string; repo: string } => {
+export interface ParsedGitHubUrl {
+  owner: string;
+  repo: string;
+  branch?: string;
+  subpath?: string;
+}
+
+export const parseGitHubSlug = (input: string): ParsedGitHubUrl => {
   const clean = input.trim().replace(/\/$/, '');
+
+  // 1. Check for full GitHub URL with /tree/<branch>/<subpath> or /blob/<branch>/<subpath>
+  const treeOrBlobMatch = clean.match(/(?:github\.com\/)?([^\/]+)\/([^\/]+)\/(?:tree|blob)\/([^\/]+)(?:\/(.+))?$/i);
+  if (treeOrBlobMatch) {
+    return {
+      owner: treeOrBlobMatch[1],
+      repo: treeOrBlobMatch[2].replace(/\.git$/, ''),
+      branch: treeOrBlobMatch[3],
+      subpath: treeOrBlobMatch[4] || undefined,
+    };
+  }
+
+  // 2. Standard owner/repo or https://github.com/owner/repo
   const match = clean.match(/(?:github\.com\/)?([^\/]+)\/([^\/]+)$/i) || clean.match(/^([^\/]+)\/([^\/]+)$/i);
   if (!match) throw new Error('Please enter a valid GitHub repository (e.g. facebook/react)');
   return { owner: match[1], repo: match[2].replace(/\.git$/, '') };
@@ -140,7 +160,20 @@ export const fetchRepoZipball = async (
   const hasToken = Boolean(token && token.trim());
   const authHeaders = getAuthHeaders(token);
 
-  const activeBranch = branch || 'HEAD';
+  let activeBranch = branch ? branch.trim() : '';
+  if (!activeBranch) {
+    try {
+      const repoRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers: authHeaders });
+      if (repoRes.ok) {
+        const repoMeta = await repoRes.json();
+        if (repoMeta.default_branch) {
+          activeBranch = repoMeta.default_branch;
+        }
+      }
+    } catch (_) {}
+    if (!activeBranch) activeBranch = 'main';
+  }
+
   const zipUrl = branch
     ? `https://api.github.com/repos/${owner}/${repo}/zipball/${encodeURIComponent(branch)}`
     : `https://api.github.com/repos/${owner}/${repo}/zipball`;

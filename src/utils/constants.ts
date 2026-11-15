@@ -5,9 +5,6 @@ export const DEFAULT_IGNORE_PATTERNS = [
   '.cache',
 
   // Security Credentials & Environment Secrets
-  '.env*',
-  '*.env.local',
-  '*.env.*.local',
   '*.pem',
   '*.key',
   '*.cert',
@@ -19,7 +16,7 @@ export const DEFAULT_IGNORE_PATTERNS = [
   'id_rsa*',
   'id_ed25519*',
 
-  // Flutter / Mobile Platform Wrappers & Build Caches (keep configuration/manifests, ignore native machine code and generated artifacts)
+  // Flutter / Mobile Platform Wrappers & Build Caches
   '*.g.dart',
   '*.freezed.dart',
   '*.mocks.dart',
@@ -65,14 +62,7 @@ export const DEFAULT_IGNORE_PATTERNS = [
   'poetry.lock',
   'Gemfile.lock',
   'composer.lock',
-  'dist',
-  'build',
-  'target',
-  'vendor',
-  'bin',
-  'obj',
   'coverage',
-  'out',
   '.vscode',
   '.idea',
   '*.log',
@@ -99,7 +89,6 @@ export const DEFAULT_IGNORE_PATTERNS = [
   '*.jpeg',
   '*.png',
   '*.gif',
-  '*.svg',
   '*.webp',
   '*.eot',
   '*.ttf',
@@ -135,9 +124,12 @@ export const LLM_CONTEXT_LIMITS: LlmContextLimit[] = [
 /** Budget applied for new installs (labelled "Default" in the marketing copy). */
 export const DEFAULT_CONTEXT_TOKENS = 1000000;
 
-export const NON_CODE_EXTENSIONS = new Set([
-  '.md', '.txt', '.rst', '.svg', '.png', '.jpg', '.jpeg', '.gif',
-  '.pdf', '.doc', '.docx', '.css', '.scss', '.sass', '.less',
-  '.json', '.yaml', '.yml', '.toml', '.xml', '.env', '.example',
-  '.lock', '.map', '.html'
+/** Pure binary and non-text media extensions that cannot be read as text in prompt bundles. */
+export const BINARY_MEDIA_EXTENSIONS = new Set([
+  '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.pdf', '.doc', '.docx',
+  '.zip', '.tar', '.gz', '.7z', '.rar', '.wasm', '.exe', '.dll', '.so', '.dylib',
+  '.woff', '.woff2', '.ttf', '.eot', '.mp4', '.mp3', '.mov', '.avi', '.db', '.sqlite',
+  '.pyc', '.pyo', '.class', '.apk', '.ipa', '.aar'
 ]);
+
+export const NON_CODE_EXTENSIONS = BINARY_MEDIA_EXTENSIONS;

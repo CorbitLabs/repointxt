@@ -1,7 +1,7 @@
 # Security Policy
 
 ## Supported Versions
-Only the latest release running on [repointxt.corbit.tech](https://repointxt.corbit.tech) is supported with security patches.
+Only the latest release running on [repointxt.filefryer.com](https://repointxt.filefryer.com) is supported with security patches.
 
 ## 100% Client-Side Privacy Guarantee
 repointxt is engineered to execute 100% within the user's browser memory.

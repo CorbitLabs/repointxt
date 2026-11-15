@@ -1,6 +1,5 @@
 import React, { useRef } from 'react';
 import { useTheme } from '../hooks/useTheme';
-import Icon from './Icon';
 
 interface BubbleInputProps {
   values?: string[];
@@ -49,7 +48,7 @@ const BubbleInput: React.FC<BubbleInputProps> = ({ values = [], setValues }) => 
         alignItems: 'center',
         padding: '3px 6px',
         minHeight: 38,
-        backgroundColor: '#0d1117',
+        backgroundColor: 'var(--bg-recessed)',
         borderColor: colors.border,
         borderWidth: 1,
         borderStyle: 'solid',
@@ -66,13 +65,13 @@ const BubbleInput: React.FC<BubbleInputProps> = ({ values = [], setValues }) => 
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            backgroundColor: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
+            backgroundColor: 'var(--bg-surface)',
+            border: '1px solid var(--border)',
             borderRadius: '4px',
             padding: '1px 6px',
             margin: '2px 3px',
             fontSize: '11px',
-            color: '#c9d1d9',
+            color: 'var(--text-main)',
             fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace'
           }}
         >
@@ -82,7 +81,7 @@ const BubbleInput: React.FC<BubbleInputProps> = ({ values = [], setValues }) => 
             style={{
               background: 'none',
               border: 'none',
-              color: '#8b949e',
+              color: 'var(--text-muted)',
               cursor: 'pointer',
               padding: 0,
               display: 'flex',

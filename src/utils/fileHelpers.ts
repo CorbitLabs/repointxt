@@ -1,4 +1,4 @@
-import { DEFAULT_IGNORE_PATTERNS, NON_CODE_EXTENSIONS } from './constants';
+import { DEFAULT_IGNORE_PATTERNS, BINARY_MEDIA_EXTENSIONS } from './constants';
 import { FileItem } from '../types';
 
 const patternCache = new Map<string, RegExp[]>();
@@ -36,7 +36,9 @@ export const shouldIgnore = (path: string, patternsStr: string = DEFAULT_IGNORE_
   if (isSecretFile(path)) return true;
 
   const isEssentialDotFile = /(^|\/)(\.env\.example|\.env\.template|\.env\.sample|\.gitignore|\.eslintrc|\.github)([\/]|$)/i.test(path);
-  if (!isEssentialDotFile && /(^|\/)\.[^/]+/i.test(path)) {
+  if (isEssentialDotFile) return false;
+
+  if (/(^|\/)\.[^/]+/i.test(path)) {
     if (/(^|\/)(\.git|\.cache|\.next|\.turbo|\.netlify|\.vercel|\.idea|\.vscode)([\/]|$)/i.test(path)) return true;
   }
 
@@ -53,17 +55,13 @@ export const getExtension = (path: string): string => {
 
 export const isCodeFile = (path: string): boolean => {
   const ext = getExtension(path);
-  return !ext || !NON_CODE_EXTENSIONS.has(ext);
+  return !ext || !BINARY_MEDIA_EXTENSIONS.has(ext);
 };
 
 /**
  * Zero-dependency BPE approximation calibrated for modern large-vocabulary LLMs
  * (Google Gemini 256k, Claude 3.5/5.5, GPT-4o) with native indentation merging
  * and code subword packing.
- *
- * This runs on every file and on every assembled batch, so it must stay O(n)
- * with no allocations. It replaces heavy multi-megabyte tokenizer dictionaries
- * while keeping token counts aligned within ~3-5% of real LLM tokenizers.
  */
 export const estimateTokens = (text: string): number => {
   if (!text) return 0;
@@ -75,9 +73,6 @@ export const estimateTokens = (text: string): number => {
   while (i < len) {
     const code = text.charCodeAt(i);
 
-    // 1. Newline + Indentation:
-    // Modern LLM tokenizers (Gemini SentencePiece, Claude BPE, GPT-4o o200k)
-    // merge '\n' followed by indentation spaces/tabs into single tokens.
     if (code === 10) {
       tokens += 1;
       i++;
@@ -86,14 +81,12 @@ export const estimateTokens = (text: string): number => {
         indentSpaces += (text.charCodeAt(i) === 9 ? 4 : 1);
         i++;
       }
-      // Indentation beyond 4 spaces adds ~0.25 token per 4 spaces
       if (indentSpaces > 4) {
         tokens += Math.floor((indentSpaces - 4) / 4) * 0.25;
       }
       continue;
     }
 
-    // 2. Mid-line whitespace runs (e.g. alignment spaces or tabs)
     if (code === 32 || code === 9) {
       let spaceCount = 0;
       while (i < len && (text.charCodeAt(i) === 32 || text.charCodeAt(i) === 9)) {
@@ -104,15 +97,12 @@ export const estimateTokens = (text: string): number => {
       continue;
     }
 
-    // 3. Word characters (identifiers, keywords, numbers)
-    // In large 100k-256k vocabularies, programming keywords and subwords
-    // merge ~6.5 characters per token.
     const isWord =
-      (code >= 97 && code <= 122) || // a-z
-      (code >= 65 && code <= 90) ||  // A-Z
-      (code >= 48 && code <= 57) ||  // 0-9
-      code === 95 ||                 // _
-      code === 36;                   // $
+      (code >= 97 && code <= 122) ||
+      (code >= 65 && code <= 90) ||
+      (code >= 48 && code <= 57) ||
+      code === 95 ||
+      code === 36;
 
     if (isWord) {
       let run = 0;
@@ -129,11 +119,10 @@ export const estimateTokens = (text: string): number => {
       continue;
     }
 
-    // 4. Operators, punctuation, and brackets
     if (code < 128) {
       tokens += 0.45;
     } else {
-      tokens += 0.8; // Non-ASCII / Unicode characters
+      tokens += 0.8;
     }
     i++;
   }
@@ -141,11 +130,6 @@ export const estimateTokens = (text: string): number => {
   return Math.ceil(tokens);
 };
 
-/**
- * Average characters per token for source code in modern LLMs (~3.8).
- * UI budgets that only know a file's byte size use this so the pre-generation
- * progress bar and the generated bundle agree closely.
- */
 export const AVG_CHARS_PER_TOKEN = 3.8;
 
 export const smartSelectFiles = (treeItems: FileItem[]): FileItem[] => {
@@ -158,19 +142,22 @@ export const smartSelectFiles = (treeItems: FileItem[]): FileItem[] => {
 
   const ESSENTIAL_FILENAMES = new Set([
     'package.json', 'pubspec.yaml', 'analysis_options.yaml', 'cargo.toml', 'go.mod', 'pyproject.toml',
-    'requirements.txt', 'tsconfig.json', 'vite.config.ts', 'next.config.js',
-    'androidmanifest.xml', 'build.gradle', 'build.gradle.kts', 'infoplist', 'podfile'
+    'requirements.txt', 'tsconfig.json', 'vite.config.ts', 'next.config.js', 'next.config.ts', 'next.config.mjs',
+    'androidmanifest.xml', 'build.gradle', 'build.gradle.kts', 'info.plist', 'infoplist', 'podfile',
+    '.env.example', '.env.template', '.env.sample'
   ]);
 
   const isFlutterProject = treeItems.some(i => i.path.toLowerCase().endsWith('pubspec.yaml'));
 
   const selected = treeItems.filter(item => {
     if (item.type !== 'blob') return false;
-    if (!isCodeFile(item.path)) return false;
 
     const lowerPath = item.path.toLowerCase();
     const parts = lowerPath.split('/');
     const filename = parts[parts.length - 1];
+
+    if (ESSENTIAL_FILENAMES.has(filename)) return true;
+    if (!isCodeFile(item.path)) return false;
 
     if (isFlutterProject) {
       if (filename === 'pubspec.yaml' || filename === 'analysis_options.yaml') return true;
@@ -179,11 +166,11 @@ export const smartSelectFiles = (treeItems: FileItem[]): FileItem[] => {
         return filename === 'androidmanifest.xml' ||
                filename === 'build.gradle' ||
                filename === 'build.gradle.kts' ||
-               filename === 'podfile';
+               filename === 'podfile' ||
+               filename === 'info.plist';
       }
     }
 
-    if (ESSENTIAL_FILENAMES.has(filename)) return true;
     if (parts.some((part, idx) => idx < parts.length - 1 && CORE_DIRECTORIES.has(part))) return true;
     if (parts.length === 1) return true;
 

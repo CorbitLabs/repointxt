@@ -10,10 +10,18 @@ import { usePromptBuilder } from './usePromptBuilder';
 const defaultOptions: ProcessingOptionsState = {
   removeComments: false,
   removeExtraWhitespace: true,
+  stripLicenseHeaders: true,
+  stubSvgPaths: true,
+  compactTailwindClasses: false,
+  refinePackageJson: false,
+  compactSupabaseTypes: false,
+  redactSecrets: true,
   maxContextTokens: DEFAULT_CONTEXT_TOKENS,
   maxFileSize: 250,
   ignorePatterns: DEFAULT_IGNORE_PATTERNS.join(', '),
   outputFormat: 'xml',
+  includeLineNumbers: false,
+  customInstructions: '',
 };
 
 export const useRepoManager = () => {
@@ -30,10 +38,18 @@ export const useRepoManager = () => {
   const [options, setOptions] = useState<ProcessingOptionsState>(() => ({
     removeComments: initialSettings.removeComments !== undefined ? initialSettings.removeComments : defaultOptions.removeComments,
     removeExtraWhitespace: initialSettings.removeExtraWhitespace !== undefined ? initialSettings.removeExtraWhitespace : defaultOptions.removeExtraWhitespace,
+    stripLicenseHeaders: initialSettings.stripLicenseHeaders !== undefined ? initialSettings.stripLicenseHeaders : defaultOptions.stripLicenseHeaders,
+    stubSvgPaths: initialSettings.stubSvgPaths !== undefined ? initialSettings.stubSvgPaths : defaultOptions.stubSvgPaths,
+    compactTailwindClasses: initialSettings.compactTailwindClasses !== undefined ? initialSettings.compactTailwindClasses : defaultOptions.compactTailwindClasses,
+    refinePackageJson: initialSettings.refinePackageJson !== undefined ? initialSettings.refinePackageJson : defaultOptions.refinePackageJson,
+    compactSupabaseTypes: initialSettings.compactSupabaseTypes !== undefined ? initialSettings.compactSupabaseTypes : defaultOptions.compactSupabaseTypes,
+    redactSecrets: initialSettings.redactSecrets !== undefined ? initialSettings.redactSecrets : defaultOptions.redactSecrets,
     maxContextTokens: initialSettings.maxContextTokens !== undefined ? initialSettings.maxContextTokens : defaultOptions.maxContextTokens,
     maxFileSize: initialSettings.maxFileSize !== undefined ? Number(initialSettings.maxFileSize) : defaultOptions.maxFileSize,
     ignorePatterns: initialSettings.ignorePatterns || defaultOptions.ignorePatterns,
     outputFormat: initialSettings.outputFormat || defaultOptions.outputFormat,
+    includeLineNumbers: initialSettings.includeLineNumbers !== undefined ? initialSettings.includeLineNumbers : defaultOptions.includeLineNumbers,
+    customInstructions: initialSettings.customInstructions || defaultOptions.customInstructions,
   }));
 
   const [activeTab, setActiveTab] = useState<string>(
@@ -125,6 +141,7 @@ export const useRepoManager = () => {
     githubToken,
     setLoading,
     setLoadingMessage,
+    setErrorMessage,
     packWorkerRef,
   });
 

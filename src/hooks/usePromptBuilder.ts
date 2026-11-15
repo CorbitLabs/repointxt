@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
-import { chunkFilesByTokenLimit, estimateTokens, AVG_CHARS_PER_TOKEN } from '../utils/fileHelpers';
-import { optimizeContent, detectBoundary } from '../utils/textOptimizer';
+import { estimateTokens, AVG_CHARS_PER_TOKEN } from '../utils/fileHelpers';
+import { optimizeContent, detectBoundary, TextOptimizeOptions } from '../utils/textOptimizer';
 import { fetchFileContent } from '../services/githubService';
 import { trackEvent, logCrash } from '../services/telemetry';
 import { Source, FileItem, PromptBatch, ProcessingOptionsState } from '../types';
@@ -25,36 +25,21 @@ type FetchOutcome = FetchedFile | { file: FileItem; error: string };
 
 interface OptimizedFile { content: string; redactedSecretsCount: number }
 
-/** Runs the text optimiser on the main thread. Used as the fallback path. */
 const optimizeOnMainThread = (
   items: FetchedFile[],
   options: ProcessingOptionsState
 ): OptimizedFile[] => {
-  const optimizeOptions = {
-    removeComments: options.removeComments,
-    removeExtraWhitespace: options.removeExtraWhitespace,
-  };
   return items.map(item =>
-    optimizeContent(item.content, item.file.originalPath || item.file.path, optimizeOptions)
+    optimizeContent(item.content, item.file.originalPath || item.file.path, options)
   );
 };
 
-/**
- * Optimises a whole batch in ONE worker roundtrip. The worker serialises the
- * array once, instead of cloning and dispatching one message plus a dedicated
- * `message` listener per file (400 files used to mean 400 roundtrips).
- */
 async function optimizeBatch(
   items: FetchedFile[],
   options: ProcessingOptionsState,
   worker: Worker | null
 ): Promise<OptimizedFile[]> {
   if (!worker || items.length === 0) return optimizeOnMainThread(items, options);
-
-  const optimizeOptions = {
-    removeComments: options.removeComments,
-    removeExtraWhitespace: options.removeExtraWhitespace,
-  };
 
   try {
     const results = await new Promise<OptimizedFile[]>((resolve, reject) => {
@@ -78,11 +63,10 @@ async function optimizeBatch(
           content: item.content,
           filePath: item.file.originalPath || item.file.path,
         })),
-        options: optimizeOptions,
+        options,
       });
     });
 
-    // Defensive: fall back if the worker returned a short/mismatched array.
     if (results.length !== items.length) return optimizeOnMainThread(items, options);
     return results;
   } catch (_) {
@@ -97,6 +81,7 @@ export interface UsePromptBuilderParams {
   githubToken: string;
   setLoading: (loading: boolean) => void;
   setLoadingMessage: (msg: string) => void;
+  setErrorMessage?: (msg: string | null) => void;
   packWorkerRef: React.RefObject<Worker | null>;
 }
 
@@ -107,6 +92,7 @@ export const usePromptBuilder = ({
   githubToken,
   setLoading,
   setLoadingMessage,
+  setErrorMessage,
   packWorkerRef,
 }: UsePromptBuilderParams) => {
   const [outputBatches, setOutputBatches] = useState<PromptBatch[]>([]);
@@ -117,11 +103,12 @@ export const usePromptBuilder = ({
     setActiveBatchIndex(0);
   }, []);
 
-  const generateText = useCallback(async () => {
-    if (sources.length === 0 || selectedFiles.length === 0) return;
+  const generateText = useCallback(async (): Promise<{ success: boolean; copied: boolean }> => {
+    if (sources.length === 0 || selectedFiles.length === 0) return { success: false, copied: false };
     const startTime = performance.now();
     setLoading(true);
-    setLoadingMessage('Optimizing context bundles...');
+    setLoadingMessage('Fetching and optimizing codebase content...');
+    if (setErrorMessage) setErrorMessage(null);
 
     trackEvent('generate_bundle_start', {
       sourceCount: sources.length,
@@ -147,8 +134,108 @@ export const usePromptBuilder = ({
         }));
       }
 
-      const fileBatches = chunkFilesByTokenLimit(allFiles, options.maxContextTokens);
-      const generatedBatches: PromptBatch[] = [];
+      // Step 1: Fetch all file contents concurrently
+      setLoadingMessage(`Fetching ${allFiles.length} file contents...`);
+      const fetched = await mapConcurrent<FileItem, FetchOutcome>(allFiles, 16, async (file) => {
+        try {
+          let content = '';
+          if (file.sourceType === 'github') {
+            content = await fetchFileContent(
+              file.sourceOwner || sources[0].owner!,
+              file.sourceRepo || sources[0].repo!,
+              file.sourceBranch || sources[0].branch || 'main',
+              file.originalPath || file.path,
+              githubToken,
+              file.sourceId
+            );
+          } else {
+            content = file.file ? await file.file.text() : await (await fetch(file.url!)).text();
+          }
+          return { file, content };
+        } catch (err: unknown) {
+          return { file, error: err instanceof Error ? err.message : String(err) };
+        }
+      });
+
+      // Step 2: Optimise all fetched files in one worker roundtrip
+      setLoadingMessage('Running code optimizers & secret scanners...');
+      const readable = fetched.filter((outcome): outcome is FetchedFile => 'content' in outcome);
+      const optimized = await optimizeBatch(readable, options, packWorkerRef.current);
+      const optimizedByFile = new Map<FileItem, OptimizedFile>();
+      readable.forEach((item, i) => optimizedByFile.set(item.file, optimized[i]));
+
+      // Step 3: Build individual file block texts and compute exact post-optimization tokens
+      interface ProcessedBlock {
+        file: FileItem;
+        text: string;
+        tokenCount: number;
+        redactedSecretsCount: number;
+      }
+
+      const addLineNumbers = (code: string): string => {
+        const lines = code.split('\n');
+        const padLen = String(lines.length).length;
+        return lines.map((line, idx) => `${String(idx + 1).padStart(padLen, ' ')} | ${line}`).join('\n');
+      };
+
+      const processedBlocks: ProcessedBlock[] = fetched.map((outcome) => {
+        const f = outcome.file;
+        const ext = f.path.includes('.') ? f.path.slice(f.path.lastIndexOf('.') + 1).toLowerCase() : 'text';
+        const isMarkdown = options.outputFormat === 'markdown';
+
+        if ('error' in outcome) {
+          const errText = isMarkdown
+            ? `## File: ${f.path}\n<!-- Error reading file: ${outcome.error} -->`
+            : `  <file path="${f.path}" status="error">\n    <!-- Error reading file: ${outcome.error} -->\n  </file>`;
+          return {
+            file: f,
+            text: errText,
+            tokenCount: estimateTokens(errText),
+            redactedSecretsCount: 0,
+          };
+        }
+
+        const optimizedFile = optimizedByFile.get(f);
+        let opt = optimizedFile?.content ?? outcome.content;
+        const redactedSecretsCount = optimizedFile?.redactedSecretsCount ?? 0;
+
+        if (options.includeLineNumbers) {
+          opt = addLineNumbers(opt);
+        }
+
+        let boundaryAttr = '';
+        if (/\.(tsx|jsx|js|ts)$/i.test(f.path)) {
+          const boundary = detectBoundary(outcome.content);
+          if (boundary) {
+            boundaryAttr = ` boundary="${boundary}"`;
+          }
+        }
+
+        if (isMarkdown) {
+          const mdText = `## File: ${f.path}\n\`\`\`${ext}\n${opt}\n\`\`\``;
+          return {
+            file: f,
+            text: mdText,
+            tokenCount: estimateTokens(mdText),
+            redactedSecretsCount,
+          };
+        }
+
+        const estTokens = estimateTokens(opt);
+        const cdataEnd = ']]' + '>';
+        const cdataEscape = ']]]]' + '><![CDATA[' + '>';
+        const safeContent = opt.replaceAll(cdataEnd, cdataEscape);
+        const xmlText = `  <file path="${f.path}"${boundaryAttr} language="${ext}" tokens="~${estTokens}">\n<![CDATA[\n${safeContent}\n${cdataEnd}\n  </file>`;
+
+        return {
+          file: f,
+          text: xmlText,
+          tokenCount: estimateTokens(xmlText),
+          redactedSecretsCount,
+        };
+      });
+
+      // Step 4: Build topology & ASCII tree helpers first to measure exact overhead
       const timestamp = new Date().toISOString();
 
       const buildTopologySummary = (files: FileItem[]): string => {
@@ -252,42 +339,69 @@ export const usePromptBuilder = ({
 
       const asciiTree = buildAsciiDirectoryTree(allFiles);
 
-      const treeManifest = allFiles
-        .map(f => `    • ${f.path} (~${Math.ceil((f.size || 0) / AVG_CHARS_PER_TOKEN)} tokens)`)
+      const treeManifest = processedBlocks
+        .map(b => `    • ${b.file.path} (~${b.tokenCount.toLocaleString()} tokens)`)
         .join('\n');
 
-      for (let bIndex = 0; bIndex < fileBatches.length; bIndex++) {
-        const batchFiles = fileBatches[bIndex];
-        const isMultiPart = fileBatches.length > 1;
+      // Measure overhead of manifest & overview to avoid overshooting maxTokens
+      const sampleHeader = `<codebase_context tool="repointxt" generated_at="${timestamp}" part="1" total_parts="1"><overview>${topologyXml}<selected_files_count>${allFiles.length}</selected_files_count><directory_structure>${asciiTree}</directory_structure><manifest>${treeManifest}</manifest></overview>`;
+      const sampleFooter = `<instructions>${options.customInstructions || '- Reference exact file paths when analyzing code.'}</instructions></codebase_context>`;
+      const overheadTokens = estimateTokens(sampleHeader + sampleFooter);
+
+      // Step 5: Accurately chunk processed blocks based on maxContextTokens
+      const maxTokens = options.maxContextTokens;
+      const isNoLimit = !maxTokens || maxTokens <= 0;
+      const maxPayloadTokens = isNoLimit
+        ? Number.POSITIVE_INFINITY
+        : Math.max(5000, maxTokens - overheadTokens - 500);
+
+      const blockBatches: ProcessedBlock[][] = [[]];
+      let currentBatchTokens = 0;
+
+      for (const block of processedBlocks) {
+        if (!isNoLimit && currentBatchTokens + block.tokenCount > maxPayloadTokens && blockBatches[blockBatches.length - 1].length > 0) {
+          blockBatches.push([]);
+          currentBatchTokens = 0;
+        }
+        blockBatches[blockBatches.length - 1].push(block);
+        currentBatchTokens += block.tokenCount;
+      }
+
+      const totalParts = blockBatches.length;
+      const generatedBatches: PromptBatch[] = [];
+
+      for (let bIndex = 0; bIndex < totalParts; bIndex++) {
+        const currentBlocks = blockBatches[bIndex];
+        const isMultiPart = totalParts > 1;
         const parts: string[] = [];
         const isMarkdown = options.outputFormat === 'markdown';
 
         if (isMarkdown) {
           parts.push(`# Repository Context: ${sources.map(s => s.name).join(', ')}`);
           parts.push(`> Generated by repointxt (100% Client-Side) at ${timestamp}`);
-          parts.push(`> Part ${bIndex + 1} of ${fileBatches.length} | Selected files: ${allFiles.length}\n`);
+          parts.push(`> Part ${bIndex + 1} of ${totalParts} | Selected files: ${allFiles.length}\n`);
           parts.push(`## File Manifest\n${treeManifest}\n`);
 
           if (isMultiPart) {
-            const batchFilePaths = new Set(batchFiles.map(f => f.path));
+            const currentPaths = new Set(currentBlocks.map(b => b.file.path));
             const deferredFiles = allFiles
-              .filter(f => !batchFilePaths.has(f.path))
+              .filter(f => !currentPaths.has(f.path))
               .slice(0, 15)
               .map(f => `- \`${f.path}\``)
               .join('\n');
 
             parts.push(`## Multi-Part Batch Notice`);
-            parts.push(`CRITICAL: This is Part ${bIndex + 1} of a ${fileBatches.length}-part codebase bundle.`);
+            parts.push(`CRITICAL: This is Part ${bIndex + 1} of a ${totalParts}-part codebase bundle.`);
             parts.push(`Deferred files sample:\n${deferredFiles}\n`);
           }
         } else {
           parts.push(
             `<codebase_context ` +
-            `tool="repointxt by Corbit Technologies" ` +
-            `github="https://github.com/CorbitTechnologies/repointxt" ` +
+            `tool="repointxt by CorbitLabs (Corbit Technologies)" ` +
+            `github="https://github.com/CorbitLabs/repointxt" ` +
             `generated_at="${timestamp}" ` +
             `part="${bIndex + 1}" ` +
-            `total_parts="${fileBatches.length}">`
+            `total_parts="${totalParts}">`
           );
           parts.push(`  <overview>`);
           parts.push(topologyXml);
@@ -298,19 +412,19 @@ export const usePromptBuilder = ({
           parts.push(`    <manifest>\n${treeManifest}\n    </manifest>`);
 
           if (isMultiPart) {
-            const batchFilePaths = new Set(batchFiles.map(f => f.path));
+            const currentPaths = new Set(currentBlocks.map(b => b.file.path));
             const deferredFiles = allFiles
-              .filter(f => !batchFilePaths.has(f.path))
+              .filter(f => !currentPaths.has(f.path))
               .slice(0, 15)
               .map(f => `      <file>${f.path}</file>`)
               .join('\n');
 
             parts.push(`    <context_batch_metadata>`);
             parts.push(`      <current_part>${bIndex + 1}</current_part>`);
-            parts.push(`      <total_parts>${fileBatches.length}</total_parts>`);
+            parts.push(`      <total_parts>${totalParts}</total_parts>`);
             parts.push(`      <deferred_files_sample>\n${deferredFiles}\n      </deferred_files_sample>`);
             parts.push(`      <ai_instruction>`);
-            parts.push(`        CRITICAL: This is Part ${bIndex + 1} of a ${fileBatches.length}-part codebase bundle.`);
+            parts.push(`        CRITICAL: This is Part ${bIndex + 1} of a ${totalParts}-part codebase bundle.`);
             parts.push(`        - Do NOT assume deferred or omitted files are missing from the project.`);
             parts.push(`        - Acknowledge receipt of Part ${bIndex + 1} and await subsequent parts before assuming missing dependencies.`);
             parts.push(`      </ai_instruction>`);
@@ -319,97 +433,29 @@ export const usePromptBuilder = ({
           parts.push(`  </overview>\n`);
         }
 
-        // Phase 1: read every file in the batch concurrently.
-        const fetched = await mapConcurrent<FileItem, FetchOutcome>(batchFiles, 16, async (file) => {
-          try {
-            let content = '';
-            if (file.sourceType === 'github') {
-              content = await fetchFileContent(
-                file.sourceOwner || sources[0].owner!,
-                file.sourceRepo || sources[0].repo!,
-                file.sourceBranch || sources[0].branch || 'main',
-                file.originalPath || file.path,
-                githubToken,
-                file.sourceId
-              );
-            } else {
-              content = file.file ? await file.file.text() : await (await fetch(file.url!)).text();
-            }
-            return { file, content };
-          } catch (err: unknown) {
-            return { file, error: err instanceof Error ? err.message : String(err) };
-          }
-        });
+        const blockTexts = currentBlocks.map(b => b.text);
+        const batchRedactedCount = currentBlocks.reduce((acc, b) => acc + b.redactedSecretsCount, 0);
 
-        // Phase 2: optimise the whole batch in a single worker roundtrip.
-        const readable = fetched.filter((outcome): outcome is FetchedFile => 'content' in outcome);
-        const optimized = await optimizeBatch(readable, options, packWorkerRef.current);
-        const optimizedByFile = new Map<FileItem, OptimizedFile>();
-        readable.forEach((item, i) => optimizedByFile.set(item.file, optimized[i]));
-
-        // Phase 3: render the per-file blocks.
-        const batchResults = fetched.map(outcome => {
-          const f = outcome.file;
-          const ext = f.path.includes('.') ? f.path.slice(f.path.lastIndexOf('.') + 1).toLowerCase() : 'text';
-
-          if ('error' in outcome) {
-            if (isMarkdown) {
-              return {
-                text: `## File: ${f.path}\n<!-- Error reading file: ${outcome.error} -->`,
-                redactedCount: 0,
-              };
-            }
-            return {
-              text: `  <file path="${f.path}" status="error">\n    <!-- Error reading file: ${outcome.error} -->\n  </file>`,
-              redactedCount: 0,
-            };
-          }
-
-          const optimizedFile = optimizedByFile.get(f);
-          const opt = optimizedFile?.content ?? outcome.content;
-          const redactedSecretsCount = optimizedFile?.redactedSecretsCount ?? 0;
-
-          let boundaryAttr = '';
-          if (/\.(tsx|jsx|js|ts)$/i.test(f.path)) {
-            const boundary = detectBoundary(outcome.content);
-            if (boundary) {
-              boundaryAttr = ` boundary="${boundary}"`;
-            }
-          }
-
-          if (isMarkdown) {
-            return {
-              text: `## File: ${f.path}\n\`\`\`${ext}\n${opt}\n\`\`\``,
-              redactedCount: redactedSecretsCount,
-            };
-          }
-
-          const estTokens = estimateTokens(opt);
-          // Split the string literal so repointxt doesn't self-escape it when packing its own repo:
-          const cdataEnd = ']]' + '>';
-          const cdataEscape = ']]]]' + '><![CDATA[' + '>';
-          const safeContent = opt.replaceAll(cdataEnd, cdataEscape);
-          return {
-            text: `  <file path="${f.path}"${boundaryAttr} language="${ext}" tokens="~${estTokens}">\n<![CDATA[\n${safeContent}\n${cdataEnd}\n  </file>`,
-            redactedCount: redactedSecretsCount,
-          };
-        });
-
-        const batchFileTexts = batchResults.map(r => r.text);
-        const batchRedactedCount = batchResults.reduce((acc, r) => acc + (r.redactedCount || 0), 0);
-
-        parts.push(batchFileTexts.join('\n\n'));
+        parts.push(blockTexts.join('\n\n'));
 
         if (isMarkdown) {
           parts.push(`\n## Instructions`);
-          parts.push(`- Reference exact file paths when analyzing or citing code.`);
-          parts.push(`- Base all recommendations strictly on the implementation patterns provided above.`);
-          parts.push(`- Avoid leaving placeholder comments like '// ... rest of code' when suggesting edits.`);
+          if (options.customInstructions?.trim()) {
+            parts.push(options.customInstructions.trim());
+          } else {
+            parts.push(`- Reference exact file paths when analyzing or citing code.`);
+            parts.push(`- Base all recommendations strictly on the implementation patterns provided above.`);
+            parts.push(`- Avoid leaving placeholder comments like '// ... rest of code' when suggesting edits.`);
+          }
         } else {
           parts.push(`\n  <instructions>`);
-          parts.push(`    - Reference exact file paths from <file path="..."> when analyzing or citing code.`);
-          parts.push(`    - Base all recommendations strictly on the implementation patterns provided above.`);
-          parts.push(`    - Avoid leaving placeholder comments like '// ... rest of code' when suggesting edits.`);
+          if (options.customInstructions?.trim()) {
+            parts.push(`    ${options.customInstructions.trim().replaceAll('\n', '\n    ')}`);
+          } else {
+            parts.push(`    - Reference exact file paths from <file path="..."> when analyzing or citing code.`);
+            parts.push(`    - Base all recommendations strictly on the implementation patterns provided above.`);
+            parts.push(`    - Avoid leaving placeholder comments like '// ... rest of code' when suggesting edits.`);
+          }
           parts.push(`  </instructions>`);
           parts.push(`</codebase_context>`);
         }
@@ -417,7 +463,7 @@ export const usePromptBuilder = ({
         const batchText = parts.join('\n');
         generatedBatches.push({
           part: bIndex + 1,
-          totalParts: fileBatches.length,
+          totalParts,
           text: batchText,
           tokenCount: estimateTokens(batchText),
           charCount: batchText.length,
@@ -443,21 +489,31 @@ export const usePromptBuilder = ({
         elapsedMs
       });
 
+      let copied = false;
       if (batchesWithMetrics.length > 0) {
-        navigator.clipboard.writeText(batchesWithMetrics[0].text).catch(() => {});
+        try {
+          await navigator.clipboard.writeText(batchesWithMetrics[0].text);
+          copied = true;
+        } catch (_) {}
       }
 
       setTimeout(() => {
         document.getElementById('output-section')?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
+
+      return { success: true, copied };
     } catch (e: any) {
       logCrash(e, false, { context: 'generateText' });
-      window.alert('Failed to generate context bundles');
+      const msg = e instanceof Error ? e.message : 'Failed to generate context bundles.';
+      if (setErrorMessage) {
+        setErrorMessage(msg);
+      }
+      return { success: false, copied: false };
     } finally {
       setLoading(false);
       setLoadingMessage('');
     }
-  }, [sources, selectedFiles, options, githubToken, packWorkerRef, setLoading, setLoadingMessage]);
+  }, [sources, selectedFiles, options, githubToken, packWorkerRef, setLoading, setLoadingMessage, setErrorMessage]);
 
   return {
     outputBatches, setOutputBatches,

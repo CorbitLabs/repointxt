@@ -4,6 +4,7 @@ import { getJSZip } from '../utils/jszip';
 import { sanitizeArchivePath } from '../services/githubService';
 import { trackEvent } from '../services/telemetry';
 import { Source, FileItem, ProcessingOptionsState } from '../types';
+import { getLocalProjectKey, loadSelectionPref } from '../utils/selectionStorage';
 
 export interface UseLocalIngestParams {
   options: ProcessingOptionsState;
@@ -231,6 +232,7 @@ export const useLocalIngest = ({
                   id: taskId,
                   file: item.file,
                   maxFileSize: Number(options.maxFileSize),
+                  ignorePatterns: options.ignorePatterns,
                 });
               });
 
@@ -312,12 +314,15 @@ export const useLocalIngest = ({
           }
         }
 
+        const projectKey = getLocalProjectKey(folderName, finalTreeItems);
+        const savedSelections = loadSelectionPref(projectKey, finalTreeItems);
+
         const newSource: Source = {
           id: sourceId,
           type: 'local',
           name: folderName,
           tree: finalTreeItems,
-          selectedFiles: smartSelectFiles(finalTreeItems)
+          selectedFiles: savedSelections !== null ? savedSelections : smartSelectFiles(finalTreeItems)
         };
 
         setSources(prev => [...prev, newSource]);

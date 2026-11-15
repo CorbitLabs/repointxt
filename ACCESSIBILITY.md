@@ -36,6 +36,6 @@ repointxt is tested and supported across modern evergreen browsers:
 We welcome your feedback on the accessibility of repointxt. If you encounter accessibility barriers:
 
 - **E-mail:** [accessibility@corbittechnologies.com](mailto:accessibility@corbittechnologies.com)
-- **GitHub Issues:** Open an issue labeled `accessibility` on [GitHub Issues](https://github.com/CorbitTechnologies/repointxt/issues)
+- **GitHub Issues:** Open an issue labeled `accessibility` on [GitHub Issues](https://github.com/CorbitLabs/repointxt/issues)
 
 We aim to respond to accessibility reports within 2 business days.
