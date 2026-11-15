@@ -6,7 +6,13 @@
   command = "pnpm dev"
   port = 3000
 
-# 301 Permanent Redirect for Domain Migration
+# 301 Permanent Redirects for Domain Migration (HTTP & HTTPS)
+[[redirects]]
+  from = "http://repointxt.corbit.tech/*"
+  to = "https://repointxt.filefryer.com/:splat"
+  status = 301
+  force = true
+
 [[redirects]]
   from = "https://repointxt.corbit.tech/*"
   to = "https://repointxt.filefryer.com/:splat"
